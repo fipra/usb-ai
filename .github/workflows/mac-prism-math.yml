@@ -1,0 +1,55 @@
+name: Mac Prism formula package
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/mac-prism-math.yml]
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and verify Rust
+        run: |
+          cargo fmt --check
+          cargo test --locked
+          cargo build --release --locked
+      - name: Update original Prism package
+        run: |
+          set -eu
+          curl -fL --retry 3 'https://github.com/fipra/usb-ai/releases/download/prism-lan-mac-2026-11-02/LlamaNest-Prism-LAN-mac-arm64.zip' -o "$RUNNER_TEMP/prism.zip"
+          mkdir -p "$RUNNER_TEMP/prism"
+          ditto -x -k "$RUNNER_TEMP/prism.zip" "$RUNNER_TEMP/prism"
+          server="$(find "$RUNNER_TEMP/prism" -type f -path '*/bin/usb-ai-rust' -print -quit)"
+          test -n "$server"
+          package="$(dirname "$(dirname "$server")")"
+          test -f "$package/PRISM_ONLY"
+          test -f "$package/bin/prism/llama-server"
+          cp target/release/usb-ai-rust "$server"
+          chmod +x "$server"
+          cp web/vendor/KATEX-LICENSE.txt "$package/KATEX-LICENSE.txt"
+          data="$(mktemp -d)"
+          USB_AI_DIR="$package" POCKET_AI_HOME="$data" "$server" >"$RUNNER_TEMP/prism-server.log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:48157/katex.min.js -o "$RUNNER_TEMP/katex.js" && break || sleep 1; done
+          test -s "$RUNNER_TEMP/katex.js"
+          curl -fsS http://127.0.0.1:48157/code-view.js | grep -q 'math-display'
+          kill "$pid" 2>/dev/null || true
+          trap - EXIT
+          ditto -c -k --sequesterRsrc --keepParent "$package" LlamaNest-Prism-LAN-mac-arm64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LlamaNest-Prism-mac-math
+          path: LlamaNest-Prism-LAN-mac-arm64.zip
+          if-no-files-found: error
+      - name: Publish Mac Prism download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag=prism-lan-mac-math-2026-11-02
+          gh release create "$tag" LlamaNest-Prism-LAN-mac-arm64.zip --target "$GITHUB_SHA" --title 'LlamaNest Prism Mac con formule matematiche' --notes 'LlamaNest Prism per Mac Apple Silicon con formattazione delle formule in locale e avvio LAN opzionale.'
