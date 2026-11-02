@@ -34,3 +34,8 @@ jobs:
         run: python scripts/test-browser-lan.py release/LlamaNest-Prism-Bonsai-Windows-x64
       - name: Test real Bonsai CPU inference
         run: python scripts/test-prism-inference.py release/LlamaNest-Prism-Bonsai-Windows-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LlamaNest-Prism-LAN-isolato-Windows-x64
+          path: release/LlamaNest-Prism-Bonsai-Windows-x64.zip
+          if-no-files-found: error
