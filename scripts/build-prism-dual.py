@@ -69,9 +69,27 @@ with tempfile.TemporaryDirectory(prefix='llamanest-prism-gpu-') as tmp:
         replace_file(main, 'setupRemoteUi();\ninit();', "$('dflash-file').onchange = () => run(async () => { const file = $('dflash-file').files[0]; if (file && (!/Ternary-Bonsai-2-9B-DFlash2-Q8_0\\.gguf$/i.test(file.name) || new TextDecoder().decode(await file.slice(0, 4).arrayBuffer()) !== 'GGUF')) throw Error('Invalid DFlash2 GGUF'); await setDraftFile(file); setStatus('DFlash2: ' + (file?.name || 'off')); });\nsetupRemoteUi();\ninit();")
     if base_path == '/nuovo-web/':
         replace_file(main, "import './style.css';", "import './style.css';\nimport './experimental-loading.css';\nimport { firstWelcome } from './experimental-welcome.js';")
+        replace_file(main, "import './style.css';", "import './style.css';\nimport { engineForModel } from './engine-routing.js';")
         replace_file(main, "let webEngine = 'prism';", "let webEngine = 'standard';")
         replace_file(main, "settings?.webEngine === 'standard' ? 'standard' : 'prism'", "settings?.webEngine === 'prism' ? 'prism' : 'standard'")
         replace_file(main, "Llama-3.2-1B-Instruct-Q4_K_M.gguf", "qwen2.5-0.5b-instruct-q4_k_m.gguf")
+        replace_file(main, "  let loaded = false;\n  try {\n    await loadModel(id, contextSize, cpuThreads, isWindows() ? windowsBackend : 'auto');", """  let loaded = false;
+  const previousEngine = webEngine;
+  try {
+    const route = engineForModel(models.find(model => model.id === id));
+    if (route === 'unsupported-ptq1') throw Error(tr('enginePtqUnsupported'));
+    if (route === 'prism' && (!navigator.gpu || typeof WebAssembly.Suspending !== 'function')) throw Error(tr('enginePrismUnavailable'));
+    if (route && route !== webEngine) {
+      await unload(); setEngineMode(route); webEngine = route; $('web-engine').value = route;
+    }
+    await loadModel(id, contextSize, cpuThreads, isWindows() ? windowsBackend : 'auto');""")
+        replace_file(main, "    if ($('models-dialog').open) $('models-dialog').close();\n  } finally {\n    clearInterval(elapsed);", """    if ($('models-dialog').open) $('models-dialog').close();
+  } catch (error) {
+    if (webEngine !== previousEngine) { setEngineMode(previousEngine); webEngine = previousEngine; $('web-engine').value = previousEngine; }
+    throw error;
+  } finally {
+    clearInterval(elapsed);""")
+
         replace_file(main, "else if (isStarterModel(models.find(model => model.id === selectedId))) await run(() => chooseModel(selectedId));", "else if (isStarterModel(models.find(model => model.id === selectedId))) await run(() => restoreExperimentalModel(selectedId));")
 
         replace_file(main, 'remoteConfig, contextSize, outputLimit, temperature, webEngine, cpuThreads,', 'remoteConfig, contextSize, outputLimit, temperature, webEngine, firstWelcomeSeen, cpuThreads,')
@@ -104,6 +122,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-prism-gpu-') as tmp:
     if base_path == '/nuovo-web/':
         with translations.open('a') as out:
             out.write('\n' + (root / 'scripts' / 'experimental-loading-strings.js').read_text())
+            out.write('\n' + (root / 'scripts' / 'experimental-engine-strings.js').read_text())
     if base_path == '/prism-dflash/':
         with translations.open('a') as out:
             out.write("\nconst dflashStrings={en:{dflashReady:'DFlash2 selected. Now load Bonsai 2 9B PQ2_0.',dflashSelect:'DFlash2 file (experimental)',dflashHelp:'Select the DFlash2 GGUF and use PrismML with Bonsai 2 9B PQ2_0. This uses additional memory; results are unverified.'},it:{dflashReady:'DFlash2 selezionato. Ora carica Bonsai 2 9B PQ2_0.',dflashSelect:'File DFlash2 (sperimentale)',dflashHelp:'Seleziona il GGUF DFlash2 e usa PrismML con Bonsai 2 9B PQ2_0. Richiede memoria aggiuntiva; risultati non verificati.'},fr:{dflashReady:'DFlash2 sélectionné. Chargez maintenant Bonsai 2 9B PQ2_0.',dflashSelect:'Fichier DFlash2 (expérimental)',dflashHelp:'Sélectionnez le GGUF DFlash2 et utilisez PrismML avec Bonsai 2 9B PQ2_0. Mémoire supplémentaire nécessaire ; résultats non vérifiés.'},de:{dflashReady:'DFlash2 ausgewählt. Lade jetzt Bonsai 2 9B PQ2_0.',dflashSelect:'DFlash2-Datei (experimentell)',dflashHelp:'Wähle die DFlash2-GGUF und nutze PrismML mit Bonsai 2 9B PQ2_0. Zusätzlicher Speicher nötig; Ergebnisse ungeprüft.'},es:{dflashReady:'DFlash2 seleccionado. Ahora carga Bonsai 2 9B PQ2_0.',dflashSelect:'Archivo DFlash2 (experimental)',dflashHelp:'Selecciona el GGUF DFlash2 y usa PrismML con Bonsai 2 9B PQ2_0. Requiere memoria adicional; resultados sin verificar.'}}; for(const lang of Object.keys(dflashStrings)) Object.assign(translations[lang],dflashStrings[lang]);\n")
