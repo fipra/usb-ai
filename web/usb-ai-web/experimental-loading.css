@@ -1,0 +1,6 @@
+.starter-card{display:flex;gap:15px;align-items:flex-start;margin:0 0 13px;padding:17px 19px;border:1px solid #d3e7dc;border-radius:16px;background:linear-gradient(120deg,#f0faf4,#f9fcf9);box-shadow:0 8px 28px #1f6c3e0d;color:#204632}
+.starter-orbit{position:relative;display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:50%;background:#e3f4e9;color:#246547;font-size:17px}
+.starter-orbit::after{content:"";position:absolute;inset:-3px;border:2px solid #c8e5d3;border-top-color:#258556;border-right-color:#76bc91;border-radius:50%;animation:starter-orbit-spin 1.15s linear infinite}
+.starter-copy{flex:1;min-width:0}.starter-heading{display:flex;justify-content:space-between;gap:12px;align-items:baseline}.starter-heading strong{font-size:14px}.starter-percent{font-size:13px;font-weight:700;color:#26714c;white-space:nowrap}.starter-copy p{font-size:12px;line-height:1.5;color:#4e715d;margin:5px 0 0}.starter-meter{height:6px;margin-top:10px;overflow:hidden;border-radius:99px;background:#d8ecdf}.starter-meter span{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#299462,#83cfa0);transition:width .2s ease}
+@keyframes starter-orbit-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.starter-orbit::after{animation:none}.starter-meter span{transition:none}}
