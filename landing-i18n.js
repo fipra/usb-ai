@@ -1,6 +1,7 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Nuovo LlamaNest Web (sperimentale)", "New LlamaNest Web (experimental)", "Nouveau LlamaNest Web (expérimental)", "Neues LlamaNest Web (experimentell)", "Nuevo LlamaNest Web (experimental)"],
     ["Windows x64 + PrismML", "Windows x64 + PrismML", "Windows x64 + PrismML", "Windows x64 + PrismML", "Windows x64 + PrismML"],
     ["PrismML e Bonsai 2 9B, come su Mac. GPU Vulkan quando disponibile, altrimenti CPU. Il modello si scarica al primo utilizzo (2,42 GB).", "PrismML and Bonsai 2 9B, just like on Mac. Vulkan GPU when available, otherwise CPU. The model downloads on first use (2.42 GB).", "PrismML et Bonsai 2 9B, comme sur Mac. GPU Vulkan si disponible, sinon CPU. Le modèle est téléchargé à la première utilisation (2,42 Go).", "PrismML und Bonsai 2 9B wie auf dem Mac. Vulkan-GPU, falls verfügbar, sonst CPU. Das Modell wird bei der ersten Nutzung heruntergeladen (2,42 GB).", "PrismML y Bonsai 2 9B, como en Mac. GPU Vulkan cuando esté disponible; de lo contrario, CPU. El modelo se descarga al primer uso (2,42 GB)."],
     ["Scarica per Windows con PrismML", "Download for Windows with PrismML", "Télécharger pour Windows avec PrismML", "Für Windows mit PrismML herunterladen", "Descargar para Windows con PrismML"],
