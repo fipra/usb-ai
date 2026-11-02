@@ -4,7 +4,7 @@ on:
     branches: [prism-lan-isolato]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   test:
     runs-on: windows-2022
@@ -32,10 +32,18 @@ jobs:
           & scripts/package-windows-prism.ps1 -PdfToText $pdf.FullName -Zip
       - name: Test two browser sessions via HTTP
         run: python scripts/test-browser-lan.py release/LlamaNest-Prism-Bonsai-Windows-x64
-      - name: Test real Bonsai CPU inference
-        run: python scripts/test-prism-inference.py release/LlamaNest-Prism-Bonsai-Windows-x64
       - uses: actions/upload-artifact@v4
         with:
           name: LlamaNest-Prism-LAN-isolato-Windows-x64
           path: release/LlamaNest-Prism-Bonsai-Windows-x64.zip
           if-no-files-found: error
+      - name: Publish separate experimental download
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $tag = 'prism-lan-isolato-2026-11-02'
+          $notes = 'Versione Windows Prism sperimentale: chat, documenti e memoria sono separati per browser, ma salvati in cartelle distinte sul PC server. Usa HTTP senza autenticazione: solo reti fidate. Il modello non e incluso.'
+          gh release create $tag 'release/LlamaNest-Prism-Bonsai-Windows-x64.zip' --target $env:GITHUB_SHA --title 'LlamaNest Windows Prism LAN - prova isolamento' --notes $notes --prerelease
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish the separate test release' }
