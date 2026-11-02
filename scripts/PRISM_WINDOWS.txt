@@ -4,6 +4,9 @@ Extract the complete ZIP, then double-click Avvia LlamaNest Prism.cmd.
 The app opens on localhost. Vulkan acceleration is selected when detected;
 otherwise the included CPU runtime is used. For CPU only, launch
 Avvia LlamaNest Prism CPU.cmd and select CPU in the model settings.
+For access from other devices on a trusted network, launch Avvia LlamaNest Prism LAN.cmd
+and use the network address and port shown in its window. LAN access has no login
+and uses unencrypted HTTP; do not expose it directly to the Internet.
 
 Like the Mac Prism edition, this package selects PrismML automatically and
 offers Ternary Bonsai 2 9B PQ2_0. Download it from the app on first use
