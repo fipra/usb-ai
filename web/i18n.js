@@ -230,3 +230,6 @@ for (const language of Object.keys(generationOptionStrings)) Object.assign(windo
 
 const autoEngineStrings={en:'Automatic (Bonsai: PrismML; other models: llama.cpp)',it:'Automatico (Bonsai: PrismML; altri modelli: llama.cpp)',fr:'Automatique (Bonsai : PrismML ; autres modèles : llama.cpp)',de:'Automatisch (Bonsai: PrismML; andere Modelle: llama.cpp)',es:'Automático (Bonsai: PrismML; otros modelos: llama.cpp)'};
 for(const language of Object.keys(autoEngineStrings)) window.USB_AI_I18N[language].engineAutomatic=autoEngineStrings[language];
+
+const modelCodeStrings={en:['Enter the code to change or install a model:','Model operation cancelled.'],it:['Inserisci il codice per cambiare o installare un modello:','Operazione sul modello annullata.'],fr:['Saisissez le code pour changer ou installer un modèle :','Opération annulée.'],de:['Code zum Ändern oder Installieren eines Modells eingeben:','Modellaktion abgebrochen.'],es:['Introduce el código para cambiar o instalar un modelo:','Operación cancelada.']};
+for(const language of Object.keys(modelCodeStrings)){window.USB_AI_I18N[language].modelAccessCode=modelCodeStrings[language][0];window.USB_AI_I18N[language].modelAccessCancelled=modelCodeStrings[language][1]}

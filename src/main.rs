@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::{
     env, fs,
     io::{self, BufRead, BufReader, Read, Write},
@@ -3003,6 +3004,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let local_client = request
             .remote_addr()
             .is_some_and(|address| address.ip().is_loopback());
+        let expected_code_hash = env::var("LLAMANEST_MODEL_CODE_SHA256").unwrap_or_else(|_| {
+            "6f45b5982ab4f8d8b6586c36c758baf8d9e23f94da84253d448ce2f5b567d5e3".into()
+        });
+        let model_code_valid = request.headers().iter().any(|header| {
+            header.field.equiv("X-LlamaNest-Model-Code")
+                && format!("{:x}", Sha256::digest(header.value.as_str().as_bytes()))
+                    == expected_code_hash
+        });
         let browser_session = request
             .headers()
             .iter()
@@ -3441,6 +3450,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "application/json",
                 b"{\"error\":\"Origin non autorizzata\"}".to_vec(),
             )
+        } else if method == Method::Post && url.starts_with("/import-model/") && !model_code_valid {
+            (
+                403,
+                "application/json",
+                b"{\"error\":\"Model management code required\"}".to_vec(),
+            )
         } else if method == Method::Post && url.starts_with("/import-model/") {
             let result = decode_name(&url[14..]).and_then(|name| {
                 let length = request
@@ -3474,7 +3489,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 match serde_json::from_slice::<Value>(&body) {
                     Ok(v) => {
                         let action = v["action"].as_str().unwrap_or("").to_owned();
-                        if action == "search-hub" {
+                        if matches!(
+                            action.as_str(),
+                            "select-model"
+                                | "choose-local-model"
+                                | "download-hub"
+                                | "download-model"
+                                | "start-quantize"
+                        ) && !model_code_valid
+                        {
+                            Err("Model management code required".into())
+                        } else if action == "search-hub" {
                             v["query"]
                                 .as_str()
                                 .ok_or_else(|| "Ricerca mancante".to_owned())
