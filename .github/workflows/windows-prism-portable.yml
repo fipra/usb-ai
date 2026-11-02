@@ -50,6 +50,8 @@ jobs:
           Expand-Archive "$env:RUNNER_TEMP/poppler.zip" "$env:RUNNER_TEMP/poppler"
           $pdf = Get-ChildItem "$env:RUNNER_TEMP/poppler" -Filter pdftotext.exe -Recurse -File | Select-Object -First 1
           & scripts/package-windows-prism.ps1 -PdfToText $pdf.FullName -Zip
+      - name: Test packaged LAN hostname access
+        run: python scripts/test-prism-lan.py release/LlamaNest-Prism-Bonsai-Windows-x64
       - name: Test Bonsai inference with packaged CPU runtime
         run: python scripts/test-prism-inference.py release/LlamaNest-Prism-Bonsai-Windows-x64
       - uses: actions/upload-artifact@v4

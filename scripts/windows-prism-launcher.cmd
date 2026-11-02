@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 set "USB_AI_DIR=%~dp0"
 set "POCKET_AI_HOME=%~dp0PocketAI-data"
-set "USB_AI_BIND_ADDR=127.0.0.1"
+if not defined USB_AI_BIND_ADDR set "USB_AI_BIND_ADDR=127.0.0.1"
 set "USB_AI_GPU="
 set "USB_AI_REQUIRE_GPU="
 set "LLAMA_PRISM_SERVER=%~dp0bin\prism\llama-server.exe"
