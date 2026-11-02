@@ -1,6 +1,10 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Il video del giorno", "Video of the day", "La vidéo du jour", "Video des Tages", "Vídeo del día"],
+    ["Cos’è la quantizzazione?", "What is quantization?", "Qu’est-ce que la quantification ?", "Was ist Quantisierung?", "¿Qué es la cuantización?"],
+    ["Scopri come i modelli AI diventano più piccoli e veloci, e cosa cambia nella loro precisione.", "Discover how AI models become smaller and faster, and how their accuracy can change.", "Découvrez comment les modèles d’IA deviennent plus petits et plus rapides, et comment leur précision peut changer.", "Entdecke, wie KI-Modelle kleiner und schneller werden und wie sich ihre Genauigkeit verändern kann.", "Descubre cómo los modelos de IA se vuelven más pequeños y rápidos, y cómo puede cambiar su precisión."],
+    ["Video in inglese", "Video in English", "Vidéo en anglais", "Video auf Englisch", "Vídeo en inglés"],
     ["Chatta in privato, senza cloud", "Chat privately, without the cloud", "Discutez en privé, sans cloud", "Privat chatten, ohne Cloud", "Chatea en privado, sin nube"],
     ["Scegli tra motore standard e PrismML per i modelli compatibili.", "Choose the standard or PrismML engine for compatible models.", "Choisissez le moteur standard ou PrismML pour les modèles compatibles.", "Wähle die Standard- oder PrismML-Engine für kompatible Modelle.", "Elige el motor estándar o PrismML para los modelos compatibles."],
     ["Puoi scegliere Bonsai 2 in Modelli sul Web o usare la versione Mac con PrismML. Il modello richiede un download di 2,42 GB.", "Choose Bonsai 2 under Models on the web or use the Mac version with PrismML. The model requires a 2.42 GB download.", "Choisissez Bonsai 2 dans Modèles sur le Web ou utilisez la version Mac avec PrismML. Le modèle nécessite un téléchargement de 2,42 Go.", "Wähle Bonsai 2 unter Modelle im Web oder verwende die Mac-Version mit PrismML. Das Modell benötigt einen Download von 2,42 GB.", "Elige Bonsai 2 en Modelos en la web o usa la versión Mac con PrismML. El modelo requiere una descarga de 2,42 GB."],

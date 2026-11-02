@@ -53,21 +53,13 @@
     .hero-note svg{color:#609372}
     .preview-stage{position:relative;padding:27px 0 22px 22px}
     .preview-stage:before{content:"";position:absolute;inset:0 0 0 8%;background:radial-gradient(ellipse at 62% 40%,#f5e7d9 0%,#f9f4eb 44%,transparent 70%);border-radius:50%;transform:scale(1.13);z-index:0}
-    .app-preview{position:relative;z-index:1;background:#fff;border:1px solid #e3e5e2;border-radius:21px;box-shadow:var(--shadow);overflow:hidden;transform:rotate(1deg)}
-    .preview-top{height:43px;border-bottom:1px solid #eceeec;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#fdfdfc}
-    .traffic{display:flex;gap:6px}.traffic i{display:block;width:8px;height:8px;background:#e0e3df;border-radius:50%}
-    .preview-top-label{font-size:10px;font-weight:700;color:#858a8b;letter-spacing:.03em}
-    .preview-main{display:grid;grid-template-columns:105px 1fr;min-height:364px}
-    .preview-side{background:#f6f7f5;border-right:1px solid #e9ebe8;padding:17px 11px}
-    .preview-side-head{display:flex;align-items:center;gap:6px;font-size:9px;font-weight:800;margin-bottom:24px}.preview-side-head span{width:13px;height:13px;border-radius:4px;background:#24292a}
-    .side-line{height:7px;border-radius:6px;background:#dfe2de;margin:13px 3px}.side-line.short{width:54%}.side-line.active{height:19px;background:#e9ece7;margin-left:0;margin-right:0}
-    .preview-chat{display:flex;flex-direction:column;padding:21px 25px 17px;gap:22px}
-    .preview-title{font-size:10px;font-weight:700;color:#686f70;text-align:center}
-    .chat-bubble{align-self:flex-end;max-width:79%;background:#f2f3f1;padding:10px 13px;border-radius:12px 12px 3px 12px;font-size:10px;line-height:1.4;color:#43494a}
-    .chat-answer{display:flex;gap:9px;max-width:90%}.chat-answer .mini-mark{display:grid;place-items:center;flex:none;width:19px;height:19px;border:1px solid #d9ded8;border-radius:7px;font-size:12px;font-weight:900;color:#856448}.chat-answer p{margin:0;font-size:10px;line-height:1.65;color:#484f50}
-    .preview-input{margin-top:auto;border:1px solid #e4e7e2;border-radius:11px;padding:10px 11px;display:flex;justify-content:space-between;color:#a4aaa5;font-size:9px}.preview-input b{display:grid;place-items:center;width:18px;height:18px;background:#252a2b;color:white;border-radius:6px;font-size:11px}
-    .float-label{position:absolute;z-index:2;left:-14px;bottom:-10px;display:flex;align-items:center;gap:9px;border:1px solid #e4e6e1;border-radius:13px;padding:11px 14px;background:#fff;box-shadow:0 10px 30px rgba(20,30,26,.09);color:#45534a;font-size:12px;font-weight:700;transform:rotate(-3deg)}
-    .float-label span{width:8px;height:8px;border-radius:50%;background:#77b488}
+    .video-card{position:relative;z-index:1;background:#fff;border:1px solid #e3e5e2;border-radius:22px;box-shadow:var(--shadow);padding:15px;overflow:hidden}
+    .video-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:3px 3px 14px}
+    .video-card-kicker{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#576d60}
+    .video-card-tag{font-size:10px;font-weight:750;letter-spacing:.06em;color:#9a694a;background:#faf0e7;border-radius:999px;padding:6px 10px}
+    .video-player{position:relative;aspect-ratio:16/9;background:#171b19;border-radius:14px;overflow:hidden}
+    .video-player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+    .video-card-body{padding:19px 5px 6px}.video-card-body h2{font-size:clamp(20px,2.2vw,26px);line-height:1.15;letter-spacing:-.045em;margin:0 0 9px}.video-card-body p{font-size:14px;line-height:1.55;color:#68716c;margin:0}.video-card-meta{display:flex;align-items:center;gap:8px;margin-top:16px;color:#758078;font-size:12px;font-weight:650}.video-card-meta span:first-child{color:#43775a}
     .section{padding:100px 0;border-top:1px solid var(--line)}
     .section-head{max-width:660px;margin-bottom:42px}.kicker{font-size:11px;color:#936c52;font-weight:800;letter-spacing:.15em;text-transform:uppercase}.section h2{font-size:clamp(35px,4vw,52px);line-height:1.08;letter-spacing:-.065em;margin:14px 0 15px;font-weight:740}.section-head p{color:var(--muted);font-size:16px;line-height:1.65;margin:0}
     .download-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
@@ -86,7 +78,7 @@
     .footer{border-top:1px solid var(--line);padding:27px 0 33px}.footer-inner{display:flex;align-items:flex-start;justify-content:space-between;gap:28px;flex-wrap:wrap}.footer-brand{font-size:12px;line-height:1.6;color:#707779}.footer-brand strong{font-size:14px;color:#24292a}.footer-contact{font-style:normal;font-size:12px;line-height:1.8;color:#596062}.footer-contact strong{display:block;color:#24292a;font-size:13px}.footer-contact a{text-decoration:underline;text-underline-offset:3px}.footer-links{display:flex;gap:22px;font-size:12px;font-weight:650;color:#596062}
     :focus-visible{outline:3px solid #bd845b;outline-offset:4px}
     @media(max-width:900px){.hero{gap:36px;padding-top:76px;padding-bottom:90px}.preview-stage{padding-left:5px}.download-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.features{gap:12px}}
-    @media(max-width:680px){.wrap{width:min(100% - 34px,560px)}.nav{min-height:68px}.nav-links{display:none}.nav-download{padding:10px 14px}.hero{grid-template-columns:1fr;gap:54px;padding-top:70px;padding-bottom:80px}.hero-copy{font-size:16px}.preview-stage{max-width:520px;margin:auto;width:100%;padding:0 0 15px 12px}.float-label{left:0}.section{padding:74px 0}.download-grid,.features,.steps,.compare-grid{grid-template-columns:1fr}.download-card{min-height:218px}.features{gap:35px}.step{min-height:155px}.closing{padding:62px 20px;margin-bottom:65px}.footer-inner{align-items:flex-start;flex-direction:column}.footer-links{flex-wrap:wrap}}
+    @media(max-width:680px){.wrap{width:min(100% - 34px,560px)}.nav{min-height:68px}.nav-links{display:none}.nav-download{padding:10px 14px}.hero{grid-template-columns:1fr;gap:54px;padding-top:70px;padding-bottom:80px}.hero-copy{font-size:16px}.preview-stage{max-width:520px;margin:auto;width:100%;padding:0 0 15px 12px}.section{padding:74px 0}.download-grid,.features,.steps,.compare-grid{grid-template-columns:1fr}.download-card{min-height:218px}.features{gap:35px}.step{min-height:155px}.closing{padding:62px 20px;margin-bottom:65px}.footer-inner{align-items:flex-start;flex-direction:column}.footer-links{flex-wrap:wrap}}
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.button,.download-card,.nav-download{transition:none}}
   .brand .brand-name{display:inline-flex;flex-direction:column;gap:3px;line-height:1.15}.brand .brand-credit{display:block;margin:0;align-self:auto;font-size:10px;font-weight:500;letter-spacing:.03em;color:#747474}
 </style>
@@ -118,12 +110,12 @@
         <div class="hero-actions"><a class="button button-dark" href="/nuovo-web/">Chatta in privato, senza cloud <span aria-hidden="true">↗</span></a></div>
         <p class="hero-note"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2 3.5 4.8v5.3c0 4.1 2.4 6.7 6.5 8 4.1-1.3 6.5-3.9 6.5-8V4.8L10 2Z" stroke="currentColor" stroke-width="1.5"/><path d="m7 10 2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Gratis per uso personale · Nessun account · Web, Mac e Windows</p>
       </div>
-      <div class="preview-stage" aria-label="Anteprima illustrativa della chat LlamaNest">
-        <div class="app-preview" aria-hidden="true">
-          <div class="preview-top"><div class="traffic"><i></i><i></i><i></i></div><span class="preview-top-label">LlamaNest · sul tuo computer</span><span></span></div>
-          <div class="preview-main"><div class="preview-side"><div class="preview-side-head"><span></span> LlamaNest</div><div class="side-line active"></div><div class="side-line"></div><div class="side-line short"></div></div><div class="preview-chat"><div class="preview-title">Nuova chat</div><div class="chat-bubble">Posso usarlo anche senza Internet?</div><div class="chat-answer"><span class="mini-mark">✳</span><p>Sì. Dopo aver scaricato un modello, puoi conversare e cercare nei tuoi documenti direttamente sul computer, anche offline.</p></div><div class="preview-input">Chiedi a LlamaNest… <b>↑</b></div></div></div>
-        </div>
-        <div class="float-label"><span></span> Pronto anche per la tua chiavetta USB</div>
+      <div class="preview-stage">
+        <article class="video-card" aria-labelledby="daily-video-title">
+          <div class="video-card-head"><span class="video-card-kicker">Il video del giorno</span><span class="video-card-tag">AI · 01</span></div>
+          <div class="video-player"><iframe src="https://www.youtube-nocookie.com/embed/mmns33BsBcY" title="IBM Technology – What Is Quantization? How AI Models Get Smaller &amp; Faster" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
+          <div class="video-card-body"><h2 id="daily-video-title">Cos’è la quantizzazione?</h2><p>Scopri come i modelli AI diventano più piccoli e veloci, e cosa cambia nella loro precisione.</p><div class="video-card-meta"><span>IBM Technology</span><span aria-hidden="true">·</span><span>Video in inglese</span></div></div>
+        </article>
       </div>
     </section>
 
