@@ -20,3 +20,5 @@
 .message-body.markdown th{background:#f7f9f8;font-weight:700}
 .message-body.markdown tbody tr:last-child td{border-bottom:0}
 .message-body.markdown .code-block{margin:1em 0}
+
+.math-display{display:block;overflow-x:auto;text-align:center;margin:1em 0;max-width:100%}.math-inline{display:inline}.math-display math,.math-inline math{font-size:1.08em}

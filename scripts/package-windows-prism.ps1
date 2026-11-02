@@ -80,6 +80,7 @@ try {
     Copy-Item $popplerNotices "$out\licenses\poppler-share" -Recurse
   }
   Copy-Item 'models\prism-catalog.json' "$out\models\catalog.json"
+  Copy-Item 'web\vendor\KATEX-LICENSE.txt' $out
   foreach ($name in @('LICENSE','LICENSE-MIT-LEGACY','COMMERCIAL_LICENSE.md','LICENSING_HISTORY.md')) {
     Copy-Item $name $out
   }
