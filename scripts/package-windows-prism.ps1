@@ -74,7 +74,13 @@ try {
 @echo off
 setlocal
 set "USB_AI_BIND_ADDR=0.0.0.0"
+if not exist "%~dp0Avvia LlamaNest Prism.cmd" (
+  echo ERROR: Avvia LlamaNest Prism.cmd not found. Extract the entire ZIP.
+  if not defined LLAMANEST_TEST_NO_PAUSE pause
+  exit /b 1
+)
 call "%~dp0Avvia LlamaNest Prism.cmd"
+exit /b %ERRORLEVEL%
 '@ | Set-Content "$out\Avvia LlamaNest Prism LAN.cmd" -Encoding ASCII
   @'
 @echo off

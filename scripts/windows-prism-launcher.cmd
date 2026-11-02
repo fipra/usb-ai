@@ -1,6 +1,11 @@
 @echo off
 setlocal
 cd /d "%~dp0"
+if not exist "%~dp0bin\usb-ai-rust.exe" (
+  echo ERROR: bin\usb-ai-rust.exe not found. Extract the entire ZIP before starting LlamaNest.
+  if not defined LLAMANEST_TEST_NO_PAUSE pause
+  exit /b 1
+)
 set "USB_AI_DIR=%~dp0"
 set "POCKET_AI_HOME=%~dp0PocketAI-data"
 if not defined USB_AI_BIND_ADDR set "USB_AI_BIND_ADDR=127.0.0.1"
@@ -15,5 +20,10 @@ if errorlevel 1 goto start
 set "LLAMA_PRISM_SERVER=%GPU_SERVER%"
 set "USB_AI_GPU=1"
 :start
+echo Starting LlamaNest. Keep this window open while using the app.
+echo Listening address: %USB_AI_BIND_ADDR%
 "%~dp0bin\usb-ai-rust.exe"
-if errorlevel 1 pause
+set "LLAMANEST_EXIT_CODE=%ERRORLEVEL%"
+echo LlamaNest stopped with exit code %LLAMANEST_EXIT_CODE%.
+if not defined LLAMANEST_TEST_NO_PAUSE pause
+exit /b %LLAMANEST_EXIT_CODE%

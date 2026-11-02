@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -13,6 +14,16 @@ launcher = package / 'Avvia LlamaNest Prism LAN.cmd'
 environment = os.environ.copy()
 environment.pop('USB_AI_BIND_ADDR', None)
 environment['LLAMANEST_PRISM_CPU'] = '1'
+environment['LLAMANEST_TEST_NO_PAUSE'] = '1'
+with tempfile.TemporaryDirectory() as directory:
+    # A broken extraction must explain the missing executable and return an error.
+    import shutil
+    for name in ('Avvia LlamaNest Prism.cmd', 'Avvia LlamaNest Prism LAN.cmd'):
+        shutil.copy2(package / name, Path(directory) / name)
+    failed = subprocess.run(['cmd.exe', '/d', '/c', str(Path(directory) / launcher.name)],
+                            env=environment, capture_output=True, text=True, timeout=15)
+    if failed.returncode == 0 or 'usb-ai-rust.exe not found' not in failed.stdout:
+        raise RuntimeError(f'Unexpected missing executable result: {failed.stdout} {failed.stderr}')
 process = subprocess.Popen(['cmd.exe', '/d', '/c', str(launcher)], env=environment,
                            creationflags=subprocess.CREATE_NO_WINDOW)
 try:
