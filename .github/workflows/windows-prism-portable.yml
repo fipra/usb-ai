@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/**'
+      - 'web/**'
+      - 'Cargo.*'
+      - 'models/prism-catalog.json'
       - 'scripts/package-windows-prism.ps1'
       - 'scripts/windows-prism-launcher.cmd'
       - 'scripts/test-prism-inference.py'
