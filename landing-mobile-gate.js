@@ -14,7 +14,7 @@
   const heroNote = document.querySelector('.hero-note');
   if (heroNote?.lastChild) heroNote.lastChild.textContent = label;
 
-  const blocked = 'a[href="#download"], a[href="/app/"], a.download-card, .footer-links a[href*="/releases/tag/rust-"]';
+  const blocked = 'a[href="#download"], a[href="/app/"], a[href="/nuovo-web/"], a.download-card, .footer-links a[href*="/releases/tag/rust-"]';
   for (const link of document.querySelectorAll(blocked)) {
     link.addEventListener('click', event => {
       event.preventDefault();

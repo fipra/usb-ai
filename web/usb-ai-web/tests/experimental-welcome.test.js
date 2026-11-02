@@ -8,6 +8,7 @@ test('the introductory response is available in every supported language', () =>
     assert.match(message, /LlamaNest/);
     assert.match(message, /Bonsai/);
     assert.match(message, /Hugging Face/);
+    assert.match(message, /\[[^\]]+\]\(https:\/\/llamanest\.vercel\.app\/#download\)/);
   }
   assert.equal(firstWelcome('unknown'), firstWelcome('en'));
 });
