@@ -53,7 +53,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-lan-test-') as directory:
         except urllib.error.HTTPError as error: assert error.code == 403
         else: raise AssertionError('Missing browser session accepted')
         # Direct API calls must not bypass model restrictions.
-        for action in ('select-model', 'download-model', 'download-hub', 'choose-local-model', 'start-quantize'):
+        for action in ('check-model-code', 'select-model', 'download-model', 'download-hub', 'choose-local-model', 'start-quantize'):
             try: post('/api', {'action':action, 'name':'nonexistent.gguf', 'modelId':'invalid'}, b)
             except urllib.error.HTTPError as error:
                 assert b'Model management code required' in error.read(), action
@@ -63,11 +63,13 @@ with tempfile.TemporaryDirectory(prefix='llamanest-lan-test-') as directory:
         else: raise AssertionError('Model import not protected')
         headers = {'Origin': base, 'Content-Type':'application/json', 'X-LlamaNest-Session': a,
                    'X-LlamaNest-Model-Code': 'test-only-code'}
-        payload = json.dumps({'action':'select-model', 'name':'nonexistent.gguf'}).encode()
-        try: http.open(urllib.request.Request(base + '/api', data=payload, headers=headers), timeout=10)
-        except urllib.error.HTTPError as error:
-            assert b'Model management code required' not in error.read()
-        else: raise AssertionError('Nonexistent model unexpectedly accepted')
+        payload = json.dumps({'action':'check-model-code'}).encode()
+        with http.open(urllib.request.Request(base + '/api', data=payload, headers=headers), timeout=10) as response:
+            assert json.load(response)['authorized'] is True
+        upload_headers = {'Origin': base, 'X-LlamaNest-Session': a, 'X-LlamaNest-Model-Code': 'test-only-code'}
+        req = urllib.request.Request(base + '/import-model/authorized.gguf', data=b'GGUFtest', headers=upload_headers)
+        with http.open(req, timeout=10) as response:
+            assert json.load(response)['model'] == 'authorized.gguf'
         print('Browser isolation and model access restrictions verified through HTTP')
     finally:
         subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],

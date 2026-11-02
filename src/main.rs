@@ -3491,7 +3491,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let action = v["action"].as_str().unwrap_or("").to_owned();
                         if matches!(
                             action.as_str(),
-                            "select-model"
+                            "check-model-code"
+                                | "select-model"
                                 | "choose-local-model"
                                 | "download-hub"
                                 | "download-model"
@@ -3499,6 +3500,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ) && !model_code_valid
                         {
                             Err("Model management code required".into())
+                        } else if action == "check-model-code" {
+                            Ok(json!({"authorized": true}))
                         } else if action == "search-hub" {
                             v["query"]
                                 .as_str()

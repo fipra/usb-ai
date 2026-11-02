@@ -43,7 +43,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          $tag = 'prism-lan-codice-2026-11-02'
+          $tag = 'prism-lan-codice-import-2026-11-02'
           $notes = 'Versione Windows LAN sperimentale con accesso protetto alla gestione dei modelli: chat, documenti e memoria sono separati per browser, ma salvati in cartelle distinte sul PC server. Usa HTTP senza autenticazione: solo reti fidate. Il modello non e incluso.'
           gh release create $tag 'release/LlamaNest-Prism-Bonsai-Windows-x64.zip' --target $env:GITHUB_SHA --title 'LlamaNest Windows Prism LAN - prova isolamento' --notes $notes --prerelease
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish the separate test release' }

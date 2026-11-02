@@ -233,3 +233,6 @@ for(const language of Object.keys(autoEngineStrings)) window.USB_AI_I18N[languag
 
 const modelCodeStrings={en:['Enter the code to change or install a model:','Model operation cancelled.'],it:['Inserisci il codice per cambiare o installare un modello:','Operazione sul modello annullata.'],fr:['Saisissez le code pour changer ou installer un modèle :','Opération annulée.'],de:['Code zum Ändern oder Installieren eines Modells eingeben:','Modellaktion abgebrochen.'],es:['Introduce el código para cambiar o instalar un modelo:','Operación cancelada.']};
 for(const language of Object.keys(modelCodeStrings)){window.USB_AI_I18N[language].modelAccessCode=modelCodeStrings[language][0];window.USB_AI_I18N[language].modelAccessCancelled=modelCodeStrings[language][1]}
+
+const invalidModelCode={en:'Incorrect model access code.',it:'Codice per i modelli non corretto.',fr:'Code d’accès au modèle incorrect.',de:'Falscher Modellzugriffscode.',es:'Código de acceso al modelo incorrecto.'};
+for(const language of Object.keys(invalidModelCode)) window.USB_AI_I18N[language].modelCodeInvalid=invalidModelCode[language];
