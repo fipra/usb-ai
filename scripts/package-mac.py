@@ -144,8 +144,18 @@ def main():
     launcher = OUT / "Avvia LlamaNest.command"
     shutil.copy2(ROOT / "scripts/mac-launcher.command", launcher)
     launcher.chmod(0o755)
+    lan_launcher = OUT / "Avvia LlamaNest LAN.command"
+    lan_launcher.write_text(
+        '#!/bin/sh\n'
+        'DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\n'
+        'export USB_AI_BIND_ADDR=0.0.0.0\n'
+        'exec "$DIR/Avvia LlamaNest.command"\n'
+    )
+    lan_launcher.chmod(0o755)
     (OUT / "LEGGIMI.txt").write_text(
         "Doppio clic su Avvia LlamaNest.command. Il browser si apre su 127.0.0.1.\n"
+        "Per accedere da un altro dispositivo usa Avvia LlamaNest LAN.command e l'indirizzo mostrato nella finestra.\n"
+        "La modalita LAN non ha login e usa HTTP non cifrato: usala solo su reti fidate.\n"
         "Al primo avvio il launcher verifica i binari inclusi e rimuove la loro quarantena.\n"
         "Tieni la cartella sulla chiavetta USB; dati e modelli restano qui.\n"
         "Questa build funziona solo su macOS con la stessa architettura indicata nel nome.\n"
