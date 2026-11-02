@@ -1,6 +1,8 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Scarica Windows Prism LAN sperimentale", "Download experimental Windows Prism LAN", "Télécharger Windows Prism LAN expérimental", "Experimentelles Windows Prism LAN herunterladen", "Descargar Windows Prism LAN experimental"],
+    ["Chat e documenti separati per browser, salvati sul server; solo per reti fidate.", "Chats and documents are separated by browser and saved on the server; trusted networks only.", "Discussions et documents séparés par navigateur, enregistrés sur le serveur ; réseaux de confiance uniquement.", "Chats und Dokumente pro Browser getrennt auf dem Server gespeichert; nur für vertrauenswürdige Netzwerke.", "Chats y documentos separados por navegador, guardados en el servidor; solo redes de confianza."],
     ["Il video del giorno", "Video of the day", "La vidéo du jour", "Video des Tages", "Vídeo del día"],
     ["Cos’è la quantizzazione?", "What is quantization?", "Qu’est-ce que la quantification ?", "Was ist Quantisierung?", "¿Qué es la cuantización?"],
     ["Scopri come i modelli AI diventano più piccoli e veloci, e cosa cambia nella loro precisione.", "Discover how AI models become smaller and faster, and how their accuracy can change.", "Découvrez comment les modèles d’IA deviennent plus petits et plus rapides, et comment leur précision peut changer.", "Entdecke, wie KI-Modelle kleiner und schneller werden und wie sich ihre Genauigkeit verändern kann.", "Descubre cómo los modelos de IA se vuelven más pequeños y rápidos, y cómo puede cambiar su precisión."],
