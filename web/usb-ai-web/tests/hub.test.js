@@ -22,6 +22,11 @@ test('only verified standalone GGUF files become results', () => {
   assert.equal(modelFromEntry('owner/repo', { path:'imatrix-dsv41-262144.gguf', size:789_000_000, lfs:{sha256:hash} }), null);
   assert.equal(modelFromEntry('owner/repo', { path:'imatrix/model-Q4_K_M.gguf', size:789_000_000, lfs:{sha256:hash} }), null);
   assert.equal(isAuxiliaryGguf('https://huggingface.co/owner/repo/resolve/main/imatrix/DeepSeek-V4.1-Flash-1017-imatrix.gguf'), true);
+  for (const filename of ['token-embd-bf16.gguf','ple-fp8.gguf','qwen-nvfp4-gptq-dense.gguf']) {
+    assert.equal(isAuxiliaryGguf(filename), true, filename);
+    assert.equal(modelFromEntry('Maximilian228/Qwen3.8-Flash-Next-NVFP4-GPTQ-Strata', {path:filename,size:1_270_000_000,lfs:{sha256:hash}}), null);
+  }
+  assert.equal(isAuxiliaryGguf('Qwen3.8-Flash-Next-Q4_K_M.gguf'), false);
   assert.equal(modelFromEntry('ggml-org/Qwen3.8-27B-GGUF', {path:'dflash-Qwen3.8-27B-Q4_0.gguf',size:1_094_000_000,lfs:{sha256:hash}}), null);
   assert.equal(modelFromEntry('owner/Qwen3-TTS-12Hz-0.6B-GGUF', {path:'model-Q4_K_M.gguf',size:605_000_000,lfs:{sha256:hash}}), null);
   assert.equal(isNonChatRepo('owner/Qwen3-TTS-12Hz-0.6B-GGUF'), true);

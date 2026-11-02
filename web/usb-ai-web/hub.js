@@ -4,7 +4,7 @@ const HASH = /^[a-f0-9]{64}$/;
 export const WEB_FILE_LIMIT = 2_000_000_000;
 const MIN_MODEL_SIZE = 32_000_000;
 const SEARCH_PAGE_SIZE = 24;
-const AUXILIARY = /(?:mmproj|adapter|lora|vocab|tokenizer|embedding|embedder|vision|audio|image[-_.]?encoder|projector|preprocessor|siglip|mtp|dflash|draft|imatrix|importance[-_.]?matrix|calibration|vocoder|speech|tts|asr)/i;
+const AUXILIARY = /(?:mmproj|adapter|lora|vocab|tokenizer|token[-_.]?embd|ple[-_.]fp8|qwen[-_.]nvfp4[-_.]gptq[-_.]dense|embedding|embedder|vision|audio|image[-_.]?encoder|projector|preprocessor|siglip|mtp|dflash|draft|imatrix|importance[-_.]?matrix|calibration|vocoder|speech|tts|asr)/i;
 const NON_CHAT_REPO = /(?:^|[-_.])(?:tts|asr|speech|audio|music|vocoder|vision|image|video|ocr|embedding|embedder|rerank|reward|vl|omni)(?:$|[-_.])/i;
 
 export function isAuxiliaryGguf(filename) {

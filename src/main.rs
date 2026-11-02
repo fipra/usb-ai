@@ -216,6 +216,24 @@ fn plausible_model_size(repo: &str, filename: &str, size: u64) -> bool {
     billions == 0.0 || size as f64 >= billions * 220_000_000.0
 }
 
+fn is_support_model_file(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    [
+        "mmproj",
+        "token-embd",
+        "token_embd",
+        "token.embd",
+        "tokenembd",
+        "ple-fp8",
+        "ple_fp8",
+        "ple.fp8",
+        "qwen-nvfp4-gptq-dense",
+        "qwen_nvfp4_gptq_dense",
+    ]
+    .iter()
+    .any(|pattern| name.contains(pattern))
+}
+
 fn valid_hub_path(path: &str) -> bool {
     !path.is_empty()
         && path.len() <= 220
@@ -229,6 +247,7 @@ fn valid_hub_path(path: &str) -> bool {
                     .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
         })
         && !path.contains("-of-")
+        && !path.split('/').any(is_support_model_file)
         && !path.split('/').any(|name| {
             let name = name.to_ascii_lowercase();
             [
@@ -1527,7 +1546,7 @@ impl App {
                     {
                         if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
                             if !name.starts_with("._")
-                                && !name.to_ascii_lowercase().contains("mmproj")
+                                && !is_support_model_file(name)
                                 && !out.contains(&name.to_owned())
                                 && split_gguf_name(name).map_or(true, |(_, index, _)| {
                                     index == 1 && model_parts(&path).is_ok()
@@ -1541,7 +1560,10 @@ impl App {
             }
         }
         for model in &self.db.external_models {
-            if model.path.is_file() && !out.contains(&model.name) {
+            if model.path.is_file()
+                && !is_support_model_file(&model.name)
+                && !out.contains(&model.name)
+            {
                 out.push(model.name.clone());
             }
         }
@@ -1572,7 +1594,7 @@ impl App {
         if name.contains('/')
             || name.contains('\\')
             || !name.to_ascii_lowercase().ends_with(".gguf")
-            || name.to_ascii_lowercase().contains("mmproj")
+            || is_support_model_file(name)
         {
             return Err("Nome modello non valido".into());
         }
@@ -1604,7 +1626,7 @@ impl App {
             .ok_or("Invalid model name")?
             .to_owned();
         if !name.to_ascii_lowercase().ends_with(".gguf")
-            || name.to_ascii_lowercase().contains("mmproj")
+            || is_support_model_file(&name)
             || !path.is_file()
         {
             return Err("Select a GGUF chat model".into());
@@ -1656,7 +1678,7 @@ impl App {
             || name.len() > 200
             || name.starts_with("._")
             || !name.to_ascii_lowercase().ends_with(".gguf")
-            || name.to_ascii_lowercase().contains("mmproj")
+            || is_support_model_file(name)
             || name
                 .chars()
                 .any(|c| c.is_control() || "/\\:<>\"|?*".contains(c))
@@ -3599,6 +3621,21 @@ mod tests {
             "x"
         )
         .is_none());
+        for name in [
+            "token-embd-bf16.gguf",
+            "ple-fp8.gguf",
+            "qwen-nvfp4-gptq-dense.gguf",
+        ] {
+            assert!(is_support_model_file(name));
+            assert!(hub_model(
+                "Maximilian228/Qwen3.8-Flash-Next-NVFP4-GPTQ-Strata",
+                name,
+                &entry,
+                "x"
+            )
+            .is_none());
+        }
+        assert!(!is_support_model_file("Qwen3.8-Flash-Next-Q4_K_M.gguf"));
         assert!(non_chat_repo("owner/Qwen3-TTS-12Hz-0.6B-GGUF"));
         assert!(hub_model(
             "owner/Qwen3-TTS-12Hz-0.6B-GGUF",
