@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-prism-gpu-') as tmp:
     shutil.copytree(web, work, ignore=shutil.ignore_patterns('node_modules', 'dist'))
     (work / 'node_modules').symlink_to(web / 'node_modules', target_is_directory=True)
     app = work / 'usb-ai-web'
-    runtime_archive = 'prism-dflash-runtime.zip' if base_path == '/prism-dflash/' else 'prism-webgpu-fast-runtime.zip' if base_path == '/prism-fast/' else 'prism-webgpu-runtime.zip'
+    runtime_archive = 'prism-dflash-runtime.zip' if base_path == '/prism-dflash/' else 'prism-webgpu-fast-runtime.zip' if base_path in ('/prism-fast/', '/nuovo-web/') else 'prism-webgpu-runtime.zip'
     with zipfile.ZipFile(root / 'scripts' / runtime_archive) as archive:
         for name in ('prism-webgpu.js', 'prism-wllama.js', 'prism-webgpu.wasm'):
             (app / name).write_bytes(archive.read(name))
@@ -137,6 +137,10 @@ with tempfile.TemporaryDirectory(prefix='llamanest-prism-gpu-') as tmp:
     replace_file(app / 'public' / 'sw.js', 'usb-ai-web-shell-', 'usb-ai-nuovo-v2-shell-' if base_path == '/nuovo-web/' else 'usb-ai-prism-dflash-shell-' if base_path == '/prism-dflash/' else 'usb-ai-prism-fast-shell-' if base_path == '/prism-fast/' else 'usb-ai-prism-gpu-shell-')
     config = app / 'vite.config.js'
     replace_file(config, "copyFileSync(resolve(base, 'wllama.wasm'), resolve(dest, 'wllama.wasm'));", "copyFileSync(resolve(base, 'wllama.wasm'), resolve(dest, 'standard-wllama.wasm'));\n    copyFileSync(resolve(import.meta.dirname, 'prism-webgpu.wasm'), resolve(dest, 'prism-webgpu.wasm'));")
+    if base_path == '/nuovo-web/':
+        # A new URL prevents existing service-worker caches from serving the old runtime.
+        replace_file(runtime, 'wasm/prism-webgpu.wasm', 'wasm/prism-fast-webgpu.wasm')
+        replace_file(config, "resolve(dest, 'prism-webgpu.wasm')", "resolve(dest, 'prism-fast-webgpu.wasm')")
     html = app / 'index.html'
     replace_file(html, '<div id="model-progress"', '<section id="bonsai-recommendation" style="background:#ecf8f0;border:1px solid #9bceb0;border-radius:14px;padding:18px;margin-bottom:18px"><strong id="bonsai-title"></strong><p id="bonsai-description" class="hint"></p><button id="bonsai-start" type="button" class="action" style="background:#137a49;color:white;border:0"></button></section><div id="model-progress"')
     replace_file(html, '<h3 data-i18n="generationSettings"></h3>', '<h3 data-i18n="generationSettings"></h3><label><span data-i18n="webEngine"></span> <select id="web-engine"><option value="prism" data-i18n="enginePrism"></option><option value="standard" data-i18n="engineStandard"></option></select></label><p class="hint" data-i18n="engineHelp"></p>')
