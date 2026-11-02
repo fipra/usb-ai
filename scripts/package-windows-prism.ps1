@@ -73,6 +73,12 @@ try {
   @'
 @echo off
 setlocal
+set "USB_AI_BIND_ADDR=0.0.0.0"
+call "%~dp0Avvia LlamaNest Prism.cmd"
+'@ | Set-Content "$out\Avvia LlamaNest Prism LAN.cmd" -Encoding ASCII
+  @'
+@echo off
+setlocal
 set "LLAMANEST_PRISM_CPU=1"
 call "%~dp0Avvia LlamaNest Prism.cmd"
 '@ | Set-Content "$out\Avvia LlamaNest Prism CPU.cmd" -Encoding ASCII
