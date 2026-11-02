@@ -1,6 +1,7 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Scarica LlamaNest LAN sperimentale per Windows e Mac", "Download experimental LlamaNest LAN for Windows and Mac", "Télécharger LlamaNest LAN expérimental pour Windows et Mac", "Experimentelles LlamaNest LAN für Windows und Mac herunterladen", "Descargar LlamaNest LAN experimental para Windows y Mac"],
     ["Il video del giorno", "Video of the day", "La vidéo du jour", "Video des Tages", "Vídeo del día"],
     ["Cos’è la quantizzazione?", "What is quantization?", "Qu’est-ce que la quantification ?", "Was ist Quantisierung?", "¿Qué es la cuantización?"],
     ["Scopri come i modelli AI diventano più piccoli e veloci, e cosa cambia nella loro precisione.", "Discover how AI models become smaller and faster, and how their accuracy can change.", "Découvrez comment les modèles d’IA deviennent plus petits et plus rapides, et comment leur précision peut changer.", "Entdecke, wie KI-Modelle kleiner und schneller werden und wie sich ihre Genauigkeit verändern kann.", "Descubre cómo los modelos de IA se vuelven más pequeños y rápidos, y cómo puede cambiar su precisión."],
