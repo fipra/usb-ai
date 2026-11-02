@@ -1,0 +1,38 @@
+name: Dory Mac experiment
+on:
+  push:
+    branches: [dory-mac-sperimentale]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build independent portable Dory package
+        run: |
+          cargo fmt --check
+          cargo test --locked
+          bash scripts/build-dory-mac-experiment.sh
+      - name: Download and verify the exact test model
+        run: |
+          curl -fL --retry 3 --connect-timeout 30 'https://huggingface.co/cloudnathan5/Dory1.0-4B-GGUF/resolve/main/experimental/Dory1.0-4B-Q4_K_M-noimat.gguf' -o "$RUNNER_TEMP/dory-test.gguf"
+          echo '0c79acf8b22cc7040bf0f49436ffa98b0e5da2f041e7fd7e971b65d435f2867a  '"$RUNNER_TEMP/dory-test.gguf" | shasum -a 256 -c -
+      - name: Test Dory response through packaged app
+        run: python3 scripts/test-dory-mac-experiment.py release/LlamaNest-Dory-Mac-Apple-Silicon "$RUNNER_TEMP/dory-test.gguf"
+      - name: Create the portable ZIP
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent release/LlamaNest-Dory-Mac-Apple-Silicon LlamaNest-Dory-Mac-Apple-Silicon.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LlamaNest-Dory-Mac-Apple-Silicon
+          path: LlamaNest-Dory-Mac-Apple-Silicon.zip
+          if-no-files-found: error
+      - name: Publish experimental download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create dory-mac-sperimentale-2026-11-02 LlamaNest-Dory-Mac-Apple-Silicon.zip --target "$GITHUB_SHA" --title 'LlamaNest Dory sperimentale per Mac Apple Silicon' --notes 'Copia separata di LlamaNest per Mac Apple Silicon con motore llama.cpp sperimentale Dory e Metal. Il modello GGUF non e incluso. Il caricamento e una risposta sono stati testati in CI su CPU; la velocita Metal dipende dal dispositivo.' --prerelease
