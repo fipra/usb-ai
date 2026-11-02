@@ -1,0 +1,35 @@
+name: Publish experimental Dory Mac build
+on:
+  push:
+    branches: [dory-mac-download]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assemble and verify the locally built package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          file=LlamaNest-Dory-Mac-Apple-Silicon.zip
+          : > "$file"
+          gh api "repos/$GH_REPO/git/blobs/3cb162cf778905ddfe767b13943b55f374402890" --jq .content | base64 -d >> "$file"
+          gh api "repos/$GH_REPO/git/blobs/032e2e0051766c0641ece82b68b248ea0560ca79" --jq .content | base64 -d >> "$file"
+          gh api "repos/$GH_REPO/git/blobs/78d6080f66d544f8285d502c7e29000857260ac1" --jq .content | base64 -d >> "$file"
+          gh api "repos/$GH_REPO/git/blobs/dcbffa172c850d8d046da0916e3f7b0e1e5f4a56" --jq .content | base64 -d >> "$file"
+          gh api "repos/$GH_REPO/git/blobs/81dff27b986a92c17bd88f1721f9052b348afdd3" --jq .content | base64 -d >> "$file"
+          echo 'd5febddc0c2c9c9f337474857d84877f81db308380432725ed177cfdd060f80c  '"$file" | sha256sum -c -
+          unzip -tq "$file"
+          if unzip -Z1 "$file" | grep -E '\\.gguf$|PocketAI-data/[^/]'; then
+            echo 'Unexpected model or workspace data in archive' >&2
+            exit 1
+          fi
+      - name: Publish the separate experimental ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create dory-mac-local-esperimento-2026-11-02 LlamaNest-Dory-Mac-Apple-Silicon.zip --target "$GITHUB_SHA" --title 'LlamaNest Dory sperimentale per Mac Apple Silicon' --notes 'Copia sperimentale indipendente con server Dory e supporto Metal. Il modello GGUF non e incluso. Il modello e stato provato con generazione CPU sul Mac; esecuzione e prestazioni Metal nel pacchetto devono ancora essere verificate.' --prerelease
