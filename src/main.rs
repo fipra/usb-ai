@@ -2821,6 +2821,15 @@ fn configured_bind_address() -> Result<Ipv4Addr, String> {
 fn origin_matches_host(origin: &str, host: Option<&str>) -> bool {
     host.is_some_and(|host| origin == format!("http://{host}"))
 }
+
+fn lan_ipv4_address() -> Option<Ipv4Addr> {
+    let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    socket.connect("192.0.2.1:80").ok()?;
+    match socket.local_addr().ok()?.ip() {
+        std::net::IpAddr::V4(ip) if !ip.is_loopback() && !ip.is_unspecified() => Some(ip),
+        _ => None,
+    }
+}
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let packaged = env::current_exe()?
         .parent()
@@ -2887,6 +2896,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("LlamaNest Rust: http://127.0.0.1:{port}");
     if !bind_address.is_loopback() {
         println!("LAN access enabled on {bind_address}:{port}");
+        let address = if bind_address.is_unspecified() {
+            lan_ipv4_address()
+        } else {
+            Some(bind_address)
+        };
+        if let Some(address) = address {
+            println!("Network address: http://{address}:{port}/");
+        }
+        if let Ok(output) = Command::new("hostname").output() {
+            let name = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+            if output.status.success() && !name.is_empty() {
+                println!("Network hostname (if resolvable): http://{name}:{port}/");
+            }
+        }
+        println!(
+            "Network access has no login and uses unencrypted HTTP. Use only on trusted networks."
+        );
     }
     open_browser(port);
     for mut request in server.incoming_requests() {
