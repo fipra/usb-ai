@@ -10,9 +10,9 @@ import zipfile
 root = Path(__file__).resolve().parents[1]
 web = root / 'web'
 base_path = os.environ.get('LLAMA_PRISM_DUAL_BASE', '/prism-dual/')
-if base_path not in ('/prism-dual/', '/prism-gpu/', '/prism-fast/', '/prism-dflash/', '/nuovo-web/', '/intel-prova/'):
+if base_path not in ('/prism-dual/', '/prism-gpu/', '/prism-fast/', '/prism-dflash/', '/nuovo-web/', '/intel-prova/', '/dory-web/'):
     raise RuntimeError('Unsupported dual-engine base path')
-experimental_web = base_path in ('/nuovo-web/', '/intel-prova/')
+experimental_web = base_path in ('/nuovo-web/', '/intel-prova/', '/dory-web/')
 dest = root / '.vercel-static' / base_path.strip('/')
 
 def replace_file(path, old, new):
@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-prism-gpu-') as tmp:
     shutil.copytree(web, work, ignore=shutil.ignore_patterns('node_modules', 'dist'))
     (work / 'node_modules').symlink_to(web / 'node_modules', target_is_directory=True)
     app = work / 'usb-ai-web'
-    runtime_archive = 'prism-webgpu-intel-runtime.zip' if base_path == '/intel-prova/' else 'prism-dflash-runtime.zip' if base_path == '/prism-dflash/' else 'prism-webgpu-fast-runtime.zip' if base_path in ('/prism-fast/', '/nuovo-web/') else 'prism-webgpu-runtime.zip'
+    runtime_archive = 'dory-webgpu-runtime.zip' if base_path == '/dory-web/' else 'prism-webgpu-intel-runtime.zip' if base_path == '/intel-prova/' else 'prism-dflash-runtime.zip' if base_path == '/prism-dflash/' else 'prism-webgpu-fast-runtime.zip' if base_path in ('/prism-fast/', '/nuovo-web/') else 'prism-webgpu-runtime.zip'
     with zipfile.ZipFile(root / 'scripts' / runtime_archive) as archive:
         for name in ('prism-webgpu.js', 'prism-wllama.js', 'prism-webgpu.wasm'):
             (app / name).write_bytes(archive.read(name))
@@ -34,6 +34,9 @@ with tempfile.TemporaryDirectory(prefix='llamanest-prism-gpu-') as tmp:
         binding = app / 'prism-wllama.js'
         replace_file(binding, 'const modelFiles = yield prepareBlobs(blobs);\n      yield this.proxy.moduleInit(modelFiles.all);', 'const modelFiles = yield prepareBlobs(blobs);\n      if (params.dflash_blob) modelFiles.all.push({blob: params.dflash_blob, name: "dflash.gguf"});\n      yield this.proxy.moduleInit(modelFiles.all);')
         replace_file(binding, 'spec_draft_model: params.spec_draft_model,', 'spec_draft_model: params.dflash_blob ? "/models/dflash.gguf" : void 0,')
+    if base_path == '/dory-web/':
+        routing = app / 'engine-routing.js'
+        replace_file(routing, "  if (hasQuant('PTQ1_0'))", "  if (/DORY1[._-]?0/.test(identity)) return 'prism';\n  if (hasQuant('PTQ1_0'))")
     if experimental_web:
         catalog = app / 'catalog.js'
         text = catalog.read_text()
@@ -131,11 +134,11 @@ with tempfile.TemporaryDirectory(prefix='llamanest-prism-gpu-') as tmp:
         with translations.open('a') as out:
             out.write("\nconst expStrings={en:{welcomePresetLabel:'Welcome message',starterHint:'Qwen 2.5 0.5B is loading locally. Write your first message to see the introduction.',safariStarterHint:'Qwen 2.5 0.5B is loading locally. Write your first message to see the introduction.'},it:{welcomePresetLabel:'Messaggio di benvenuto',starterHint:'Qwen 2.5 0,5B si prepara in locale. Scrivi il primo messaggio per leggere il benvenuto.',safariStarterHint:'Qwen 2.5 0,5B si prepara in locale. Scrivi il primo messaggio per leggere il benvenuto.'},fr:{welcomePresetLabel:'Message de bienvenue',starterHint:'Qwen 2.5 0,5B se prépare localement. Écrivez votre premier message pour voir l’accueil.',safariStarterHint:'Qwen 2.5 0,5B se prépare localement. Écrivez votre premier message pour voir l’accueil.'},de:{welcomePresetLabel:'Willkommensnachricht',starterHint:'Qwen 2.5 0,5B wird lokal vorbereitet. Schreibe deine erste Nachricht für die Begrüßung.',safariStarterHint:'Qwen 2.5 0,5B wird lokal vorbereitet. Schreibe deine erste Nachricht für die Begrüßung.'},es:{welcomePresetLabel:'Mensaje de bienvenida',starterHint:'Qwen 2.5 0,5B se prepara localmente. Escribe tu primer mensaje para ver la bienvenida.',safariStarterHint:'Qwen 2.5 0,5B se prepara localmente. Escribe tu primer mensaje para ver la bienvenida.'}}; for(const lang of Object.keys(expStrings)) Object.assign(translations[lang],expStrings[lang]);\n")
     replace_file(app / 'hub.js', 'export const WEB_FILE_LIMIT = 2_000_000_000;', 'export const WEB_FILE_LIMIT = 3_000_000_000;')
-    database = 'usb-ai-web-intel-test-v1' if base_path == '/intel-prova/' else 'usb-ai-web-nuovo-v2' if base_path == '/nuovo-web/' else 'usb-ai-web-prism-dflash-v1' if base_path == '/prism-dflash/' else 'usb-ai-web-prism-fast-v1' if base_path == '/prism-fast/' else 'usb-ai-web-prism-gpu-experimental-v1'
+    database = 'usb-ai-web-dory-experiment-v1' if base_path == '/dory-web/' else 'usb-ai-web-intel-test-v1' if base_path == '/intel-prova/' else 'usb-ai-web-nuovo-v2' if base_path == '/nuovo-web/' else 'usb-ai-web-prism-dflash-v1' if base_path == '/prism-dflash/' else 'usb-ai-web-prism-fast-v1' if base_path == '/prism-fast/' else 'usb-ai-web-prism-gpu-experimental-v1'
     replace_file(app / 'storage.js', "const DB = 'usb-ai-web-v1'", f"const DB = '{database}'")
     replace_file(app / 'main.js', 'llamanest-remote-panel-open', 'llamanest-prism-gpu-remote-panel-open')
     replace_file(app / 'folder-models.js', 'usb-ai-models', 'usb-ai-prism-gpu-models')
-    replace_file(app / 'public' / 'sw.js', 'usb-ai-web-shell-', 'usb-ai-intel-test-shell-' if base_path == '/intel-prova/' else 'usb-ai-nuovo-v2-shell-' if base_path == '/nuovo-web/' else 'usb-ai-prism-dflash-shell-' if base_path == '/prism-dflash/' else 'usb-ai-prism-fast-shell-' if base_path == '/prism-fast/' else 'usb-ai-prism-gpu-shell-')
+    replace_file(app / 'public' / 'sw.js', 'usb-ai-web-shell-', 'usb-ai-dory-test-shell-' if base_path == '/dory-web/' else 'usb-ai-intel-test-shell-' if base_path == '/intel-prova/' else 'usb-ai-nuovo-v2-shell-' if base_path == '/nuovo-web/' else 'usb-ai-prism-dflash-shell-' if base_path == '/prism-dflash/' else 'usb-ai-prism-fast-shell-' if base_path == '/prism-fast/' else 'usb-ai-prism-gpu-shell-')
     config = app / 'vite.config.js'
     replace_file(config, "copyFileSync(resolve(base, 'wllama.wasm'), resolve(dest, 'wllama.wasm'));", "copyFileSync(resolve(base, 'wllama.wasm'), resolve(dest, 'standard-wllama.wasm'));\n    copyFileSync(resolve(import.meta.dirname, 'prism-webgpu.wasm'), resolve(dest, 'prism-webgpu.wasm'));")
     if experimental_web:
@@ -152,6 +155,8 @@ with tempfile.TemporaryDirectory(prefix='llamanest-prism-gpu-') as tmp:
     banner = '''<div id="prism-gpu-notice" style="background:#fff3cd;padding:10px;text-align:center;color:#503a00">Experimental Prism WebGPU: GPU for model layers; some operations run on CPU. Chrome on Apple Silicon tested; performance varies. Separate browser data.</div><script>const m={it:'Prism WebGPU sperimentale: livelli del modello sulla GPU; alcune operazioni usano la CPU. Provato con Chrome su Apple Silicon; velocità variabile. Dati del browser separati.',fr:'Prism WebGPU expérimental : couches du modèle sur GPU ; certaines opérations utilisent le processeur. Testé avec Chrome sur Apple Silicon ; vitesse variable. Données séparées.',de:'Prism WebGPU experimentell: Modellebenen auf der GPU; einige Vorgänge nutzen die CPU. Mit Chrome auf Apple Silicon getestet; Geschwindigkeit variiert. Separate Browserdaten.',es:'Prism WebGPU experimental: capas del modelo en GPU; algunas operaciones usan la CPU. Probado con Chrome en Apple Silicon; velocidad variable. Datos separados.'};document.getElementById('prism-gpu-notice').textContent=m[(navigator.language||'en').slice(0,2)]||document.getElementById('prism-gpu-notice').textContent;</script>'''
     if experimental_web:
         banner = ''
+    if base_path == '/dory-web/':
+        banner = '''<div id="dory-test-notice" style="background:#fff3cd;padding:10px;text-align:center;color:#503a00">Experimental Dory Web: the engine and speed are being tested. Browser data is separate.</div><script>const doryNotice={it:'Dory Web sperimentale: il motore e la velocità sono in fase di verifica. I dati del browser sono separati.',fr:'Dory Web expérimental : moteur et vitesse en cours de vérification. Données séparées.',de:'Experimentelles Dory Web: Engine und Geschwindigkeit werden geprüft. Separate Browserdaten.',es:'Dory Web experimental: motor y velocidad en evaluación. Datos separados.'};document.getElementById('dory-test-notice').textContent=doryNotice[(navigator.language||'en').slice(0,2)]||document.getElementById('dory-test-notice').textContent;</script>'''
     if base_path == '/intel-prova/':
         banner = '''<div id="intel-test-notice" style="background:#fff3cd;padding:10px;text-align:center;color:#503a00">Experimental Intel GPU test. Speed and answer quality are not yet verified. Browser data is separate.</div><script>const m={it:'Test sperimentale GPU Intel. Velocità e correttezza delle risposte non sono ancora verificate. I dati del browser sono separati.',fr:'Test GPU Intel expérimental. Vitesse et qualité des réponses non encore vérifiées. Données séparées.',de:'Experimenteller Intel-GPU-Test. Geschwindigkeit und Antwortqualität sind noch nicht geprüft. Separate Browserdaten.',es:'Prueba experimental de GPU Intel. La velocidad y la calidad de las respuestas aún no están verificadas. Datos separados.'};document.getElementById('intel-test-notice').textContent=m[(navigator.language||'en').slice(0,2)]||document.getElementById('intel-test-notice').textContent;</script>'''
     if base_path == '/prism-fast/':
