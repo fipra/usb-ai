@@ -83,6 +83,25 @@
   const inlinePattern = /(`+)([^`\n]+?)\1|\[([^\]\n]+)\]\(([^\s)]+)\)|\*\*([^*\n]+)\*\*|__([^_\n]+)__|~~([^~\n]+)~~|\*([^*\n]+)\*|_([^_\n]+)_|(https?:\/\/[^\s<>]+)/g;
   const wordCharacter = character => /[\p{L}\p{N}]/u.test(character || '');
   function appendInline(parent, text, depth = 0) {
+    if (!window.katex || depth > 5) return appendInlineMarkdown(parent, text, depth);
+    const pattern = /(`+)([^`\n]*?)\1|\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([^\n]+?)\\\)|(?<![\\$])\$(?![\s$])([^\n$]*?\S)\$(?!\$)/g;
+    let cursor = 0;
+    for (const match of text.matchAll(pattern)) {
+      if (match[1]) continue; // Backticks retain literal content, including dollar signs.
+      const formula = match[3] || match[4] || match[5] || match[6];
+      if (!formula) continue;
+      if (match.index > cursor) appendInlineMarkdown(parent, text.slice(cursor, match.index), depth);
+      const display = !!(match[3] || match[4]);
+      const node = element('span', undefined, display ? 'math-display' : 'math-inline');
+      try {
+        node.innerHTML = window.katex.renderToString(formula, { output: 'mathml', displayMode: display, throwOnError: false, trust: false, strict: 'ignore', maxExpand: 1000 });
+        parent.append(node);
+      } catch { parent.append(document.createTextNode(match[0])); }
+      cursor = match.index + match[0].length;
+    }
+    if (cursor < text.length) appendInlineMarkdown(parent, text.slice(cursor), depth);
+  }
+  function appendInlineMarkdown(parent, text, depth = 0) {
     if (depth > 5) { parent.append(document.createTextNode(text)); return; }
     const pattern = new RegExp(inlinePattern.source, 'g');
     let cursor = 0;
@@ -316,7 +335,7 @@
   }
   function render(container, text, language = 'en') {
     const parts = blocks(text || '');
-    const rich = parts.some(part => part.type === 'code') || /\n\s*\n|(^|\n) {0,3}(?:#{1,6}\s|>|[-*+]\s|\d{1,3}[.)]\s|[-*_]{3,}\s*$)|[`*_~\[\]|]|https?:\/\//m.test(text || '');
+    const rich = parts.some(part => part.type === 'code') || /[$]|\\[([]/.test(text || '') || /\n\s*\n|(^|\n) {0,3}(?:#{1,6}\s|>|[-*+]\s|\d{1,3}[.)]\s|[-*_]{3,}\s*$)|[`*_~\[\]|]|https?:\/\//m.test(text || '');
     container.classList?.toggle('markdown', rich);
     if (!rich) {
       const plain = text || '';

@@ -189,3 +189,23 @@ test('unfenced HTML renders as code with preview and ZIP controls', () => {
     assert.equal(blocks('Spiega il tag <html> nella pagina.')[0].type, 'text');
   } finally { globalThis.document = originalDocument; }
 });
+
+test('math renders as MathML while code remains literal', async () => {
+  const originalDocument = globalThis.document;
+  const katex = (await import('katex')).default;
+  const makeElement = tag => ({ tagName: tag.toUpperCase(), children: [], className: '', textContent: '', innerHTML: '', append(...items) { this.children.push(...items); }, replaceChildren(...items) { this.children = items; }, classList: { toggle() {} } });
+  globalThis.document = { createElement: makeElement, createTextNode: data => ({nodeType: 3, data}) };
+  window.katex = katex;
+  try {
+    const container = makeElement('div');
+    window.USB_AI_CODE_VIEW.render(container, 'Formula $x^2$ e \\(\\frac{1}{2}\\).\n\n$$\\frac{a}{b}$$\n\n`$not_math$`\n\n```tex\n$x$\n```');
+    const all = []; const visit = item => { all.push(item); (item.children || []).forEach(visit); }; visit(container);
+    const math = all.filter(item => item.className === 'math-inline' || item.className === 'math-display');
+    assert.equal(math.length, 3);
+    assert.ok(math.every(node => node.innerHTML.includes('<math')));
+    assert.ok(math[1].innerHTML.includes('<mfrac>'));
+    assert.ok(math[2].innerHTML.includes('<mfrac>'));
+    assert.ok(all.some(item => item.tagName === 'CODE' && item.textContent === '$not_math$'));
+    assert.ok(all.some(item => item.tagName === 'CODE' && item.textContent === '$x$'));
+  } finally { globalThis.document = originalDocument; delete window.katex; }
+});

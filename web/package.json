@@ -13,6 +13,7 @@
     "@wllama/wllama": "^3.0.0",
     "@wllama/wllama-compat": "^3.8.1",
     "hash-wasm": "^4.12.0",
+    "katex": "0.16.22",
     "pdfjs-dist": "5.4.296"
   },
   "devDependencies": {

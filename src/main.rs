@@ -23,6 +23,7 @@ const MODEL_CATALOG: &str = include_str!("../models/catalog.json");
 const PRISM_MODEL_CATALOG: &str = include_str!("../models/prism-catalog.json");
 const I18N: &str = include_str!("../web/i18n.js");
 const CODE_VIEW: &str = include_str!("../web/code-view.js");
+const KATEX: &str = include_str!("../web/vendor/katex.min.js");
 const RESPONSE_VIEW: &str = include_str!("../web/response-view.js");
 const RESPONSE_VIEW_CSS: &str = include_str!("../web/response-view.css");
 const MESSAGE_MARKDOWN_CSS: &str = include_str!("../web/message-markdown.css");
@@ -3171,6 +3172,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 200,
                 "text/javascript; charset=utf-8",
                 I18N.as_bytes().to_vec(),
+            )
+        } else if method == Method::Get && url == "/katex.min.js" {
+            (
+                200,
+                "text/javascript; charset=utf-8",
+                KATEX.as_bytes().to_vec(),
             )
         } else if method == Method::Get && url == "/code-view.js" {
             (
