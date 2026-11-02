@@ -1,0 +1,35 @@
+name: Publish Dory Mac reasoning fix
+on:
+  push:
+    branches: [dory-mac-risposta]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assemble and verify the corrected package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          file=LlamaNest-Dory-Mac-Apple-Silicon.zip
+          : > "$file"
+          gh api "repos/$GH_REPO/git/blobs/2c1eb69b2e45c631bdcd96fae3e993ff38ffe3f6" --jq .content | base64 -d >> "$file"
+          gh api "repos/$GH_REPO/git/blobs/daaad51484c9f259ab90a9fdcc423650cc649f64" --jq .content | base64 -d >> "$file"
+          gh api "repos/$GH_REPO/git/blobs/baeeeab01e66bf130f8b515834003b04d52bd07f" --jq .content | base64 -d >> "$file"
+          gh api "repos/$GH_REPO/git/blobs/35c5c650d7d18857a48f5753aff9fbf2047417a3" --jq .content | base64 -d >> "$file"
+          gh api "repos/$GH_REPO/git/blobs/7d5971939d110efa93e9df161affe6a1c554d8e5" --jq .content | base64 -d >> "$file"
+          echo 'f8e633435476bda9dae2a73edb33a140abf815103b0ac61218ffa3bc465d221a  '"$file" | sha256sum -c -
+          unzip -tq "$file"
+          if unzip -Z1 "$file" | grep -E '\\.gguf$|PocketAI-data/[^/]'; then
+            echo 'Unexpected model or workspace data in archive' >&2
+            exit 1
+          fi
+      - name: Publish corrected Dory Mac ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create dory-mac-risposta-2026-11-02 LlamaNest-Dory-Mac-Apple-Silicon.zip --target "$GITHUB_SHA" --title 'LlamaNest Dory Mac - risposta corretta' --notes 'Versione separata sperimentale per Apple Silicon. Corretto il formato delle risposte quando il modello Dory usa il ragionamento. Il modello GGUF non e incluso.' --prerelease

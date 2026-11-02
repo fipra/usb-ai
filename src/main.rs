@@ -964,12 +964,21 @@ fn is_qwen35(model: &Path) -> bool {
         || name.contains("bonsai_2")
 }
 
+fn is_dory_model(model: &Path) -> bool {
+    let name = model
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_ascii_lowercase();
+    name.contains("dory1.0") || name.contains("dory1_0") || name.contains("dory1-0")
+}
+
 // Some llama-server versions leave the opening reasoning tag in the prompt,
 // so it never appears in completion tokens. Qwen 3.5's template uses an empty
 // thinking block when thinking is disabled. Preserve the template's prefix
 // for other models and when no opening marker is present.
 fn qwen35_reasoning_prompt(formatted: String, model: &Path, thinking: bool) -> (String, bool) {
-    if !is_qwen35(model) {
+    if !is_qwen35(model) && !is_dory_model(model) {
         return (formatted, false);
     }
     let trimmed = formatted.trim_end();
@@ -999,7 +1008,7 @@ fn apply_model_chat_template(
 ) -> Result<String, String> {
     let mut request =
         json!({"messages":model_template_messages(messages.clone(), model, thinking)});
-    if is_qwen35(model) {
+    if is_qwen35(model) || is_dory_model(model) {
         request["chat_template_kwargs"] = json!({"enable_thinking":thinking});
     }
     let body = request.to_string();
@@ -2300,7 +2309,7 @@ impl App {
                         .to_string(),
                         "--no-webui",
                     ]);
-                if is_qwen35(model) {
+                if is_qwen35(model) || is_dory_model(model) {
                     command.arg("--jinja");
                 }
                 if self.db.inference_threads > 0 {
@@ -3940,6 +3949,24 @@ mod tests {
             )
             .unwrap(),
             "Ciao!"
+        );
+    }
+    #[test]
+    fn dory_respects_thinking_mode_when_template_prefills_think_tag() {
+        let model = Path::new("Dory1.0-4B-Q4_K_M-noimat.gguf");
+        let open = "<|im_start|>assistant\n<think>\n";
+        assert_eq!(
+            qwen35_reasoning_prompt(open.into(), model, true),
+            (open.into(), true)
+        );
+        assert_eq!(
+            qwen35_reasoning_prompt(open.into(), model, false),
+            ("<|im_start|>assistant\n<think>\n</think>\n\n".into(), false)
+        );
+        let closed = "<|im_start|>assistant\n<think></think>";
+        assert_eq!(
+            qwen35_reasoning_prompt(closed.into(), model, false),
+            (closed.into(), false)
         );
     }
     #[test]
