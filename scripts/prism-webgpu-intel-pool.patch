@@ -1,0 +1,35 @@
+--- a/ggml/src/ggml-webgpu/ggml-webgpu.cpp
++++ b/ggml/src/ggml-webgpu/ggml-webgpu.cpp
+@@ -254,6 +254,8 @@
+     wgpu::Buffer             set_rows_host_error_buf;
+     wgpu::CommandEncoder     active_command_encoder;
+     wgpu::ComputePassEncoder active_compute_pass;
++    wgpu::Buffer             gdn_scratch[6]{};
++    uint64_t                 gdn_scratch_sizes[6]{};
+     bool                     batch_compute_passes = true;
+ 
+     size_t memset_bytes_per_thread;
+@@ -1437,12 +1439,18 @@
+     ggml_tensor * inputs[] = { src0, src1, src2, src3, src4, src5 };
+     for (uint32_t i = 0; i < 6; ++i) {
+         const uint64_t size = ROUNDUP_POW2(ggml_nbytes(inputs[i]), WEBGPU_STORAGE_BUF_BINDING_MULT);
+-        wgpu::Buffer scratch;
+-        ggml_webgpu_create_buffer(ctx->global_ctx->device, scratch, size,
+-                                  wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, "gdn_input_scratch");
++        // Commands use separate compute passes and one ordered GPU queue. Reuse
++        // the buffer across GDN operations, growing it only when necessary.
++        if (!ctx->gdn_scratch[i] || ctx->gdn_scratch_sizes[i] < size) {
++            wgpu::Buffer scratch;
++            ggml_webgpu_create_buffer(ctx->global_ctx->device, scratch, size,
++                                      wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, "gdn_input_scratch");
++            ctx->gdn_scratch[i] = scratch;
++            ctx->gdn_scratch_sizes[i] = size;
++        }
+         ctx->active_command_encoder.CopyBufferToBuffer(ggml_webgpu_tensor_buf(inputs[i]),
+-                                                        ggml_webgpu_tensor_offset(inputs[i]), scratch, 0, size);
+-        entries.push_back(ggml_webgpu_make_bind_group_entry(i, scratch, 0, size));
++                                                        ggml_webgpu_tensor_offset(inputs[i]), ctx->gdn_scratch[i], 0, size);
++        entries.push_back(ggml_webgpu_make_bind_group_entry(i, ctx->gdn_scratch[i], 0, size));
+     }
+     entries.push_back(ggml_webgpu_make_tensor_bind_group_entry(ctx, 6, dst));
+ 
