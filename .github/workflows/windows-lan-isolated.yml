@@ -1,0 +1,36 @@
+name: Windows Prism LAN isolated test
+on:
+  push:
+    branches: [prism-lan-isolato]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: rustup update stable
+      - name: Test Rust
+        shell: pwsh
+        run: |
+          cargo fmt --check
+          if ($LASTEXITCODE -ne 0) { throw 'Formatting failed' }
+          cargo test --locked
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+      - name: Package Prism
+        shell: pwsh
+        run: |
+          curl.exe -fL --retry 3 'https://github.com/oschwartz10612/poppler-windows/releases/download/v26.09.0-0/Release-26.09.0-0.zip' -o "$env:RUNNER_TEMP/poppler.zip"
+          if ($LASTEXITCODE -ne 0) { throw 'Poppler download failed' }
+          Expand-Archive "$env:RUNNER_TEMP/poppler.zip" "$env:RUNNER_TEMP/poppler"
+          $pdf = Get-ChildItem "$env:RUNNER_TEMP/poppler" -Filter pdftotext.exe -Recurse -File | Select-Object -First 1
+          & scripts/package-windows-prism.ps1 -PdfToText $pdf.FullName -Zip
+      - name: Test two browser sessions via HTTP
+        run: python scripts/test-browser-lan.py release/LlamaNest-Prism-Bonsai-Windows-x64
+      - name: Test real Bonsai CPU inference
+        run: python scripts/test-prism-inference.py release/LlamaNest-Prism-Bonsai-Windows-x64

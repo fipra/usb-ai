@@ -563,7 +563,7 @@ struct ExternalModel {
     name: String,
     path: PathBuf,
 }
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 struct Workspace {
     #[serde(default)]
     chats: Vec<Chat>,
@@ -727,6 +727,7 @@ fn memory_recall_answer(language: &str, notes: &[String]) -> String {
 }
 struct App {
     root: PathBuf,
+    session_id: Option<String>,
     models: PathBuf,
     db: Workspace,
     selected: Option<String>,
@@ -1498,9 +1499,14 @@ impl App {
     }
     fn save(&self) -> Result<(), String> {
         let data = serde_json::to_vec_pretty(&self.db).map_err(|e| e.to_string())?;
-        let tmp = self.root.join("workspace.json.tmp");
+        let directory = match &self.session_id {
+            Some(id) => self.root.join("browser-sessions").join(id),
+            None => self.root.clone(),
+        };
+        fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+        let tmp = directory.join("workspace.json.tmp");
         fs::write(&tmp, data).map_err(|e| e.to_string())?;
-        fs::rename(tmp, self.root.join("workspace.json")).map_err(|e| e.to_string())?;
+        fs::rename(tmp, directory.join("workspace.json")).map_err(|e| e.to_string())?;
         let markdown = format!(
             "# LlamaNest memory\n\n{}",
             self.db
@@ -1509,9 +1515,40 @@ impl App {
                 .map(|note| format!("- {}\n", note.text.replace('\n', " ")))
                 .collect::<String>()
         );
-        let tmp = self.root.join("memory.md.tmp");
+        let tmp = directory.join("memory.md.tmp");
         fs::write(&tmp, markdown).map_err(|e| e.to_string())?;
-        fs::rename(tmp, self.root.join("memory.md")).map_err(|e| e.to_string())
+        fs::rename(tmp, directory.join("memory.md")).map_err(|e| e.to_string())
+    }
+
+    fn with_browser_session<T>(
+        &mut self,
+        id: &str,
+        run: impl FnOnce(&mut Self) -> Result<T, String>,
+    ) -> Result<T, String> {
+        if !valid_browser_session(id) {
+            return Err("Invalid browser session".into());
+        }
+        let path = self
+            .root
+            .join("browser-sessions")
+            .join(id)
+            .join("workspace.json");
+        let workspace = if path.exists() {
+            serde_json::from_slice(&fs::read(path).map_err(|e| e.to_string())?)
+                .map_err(|e| e.to_string())?
+        } else {
+            let mut workspace = self.db.clone();
+            workspace.chats.clear();
+            workspace.documents.clear();
+            workspace.memory.clear();
+            workspace
+        };
+        let previous = std::mem::replace(&mut self.db, workspace);
+        let previous_session = self.session_id.replace(id.to_owned());
+        let result = run(self);
+        self.db = previous;
+        self.session_id = previous_session;
+        result
     }
     fn models(&self) -> Vec<String> {
         let mut out = Vec::new();
@@ -2822,6 +2859,10 @@ fn origin_matches_host(origin: &str, host: Option<&str>) -> bool {
     host.is_some_and(|host| origin == format!("http://{host}"))
 }
 
+fn valid_browser_session(id: &str) -> bool {
+    id.len() == 64 && id.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn lan_ipv4_address() -> Option<Ipv4Addr> {
     let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
     socket.connect("192.0.2.1:80").ok()?;
@@ -2868,6 +2909,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         download_error: None,
         inference: None,
         quantization: None,
+        session_id: None,
     };
     let installed = app_state.models();
     if app_state.prism_only() {
@@ -2939,6 +2981,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let local_client = request
             .remote_addr()
             .is_some_and(|address| address.ip().is_loopback());
+        let browser_session = request
+            .headers()
+            .iter()
+            .find(|header| header.field.equiv("X-LlamaNest-Session"))
+            .map(|header| header.value.as_str().to_owned());
+        if method == Method::Post
+            && (url == "/api"
+                || url == "/api/stream"
+                || url == "/api/stop"
+                || url.starts_with("/upload/")
+                || url.starts_with("/import-model/"))
+            && !browser_session
+                .as_deref()
+                .is_some_and(valid_browser_session)
+        {
+            let _ = request
+                .respond(Response::from_string("Browser session required").with_status_code(403));
+            continue;
+        }
         if method == Method::Get
             && (url.starts_with("/creator/export/") || url.starts_with("/creator/gguf/"))
         {
@@ -3016,6 +3077,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             continue;
         }
         if method == Method::Post && url == "/api/stream" && allowed_origin {
+            let browser_session = browser_session.clone().expect("validated browser session");
             let mut body = Vec::new();
             let parsed = request
                 .as_reader()
@@ -3062,16 +3124,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if !registered {
                         return Err("A response is already running".into());
                     }
-                    app.lock().unwrap().send_with_updates(
-                        data,
-                        &mut |delta| {
-                            let event = json!({"type":"delta","text":delta}).to_string() + "\n";
-                            sender
-                                .send(event.into_bytes())
-                                .map_err(|_| "Browser disconnected".to_owned())
-                        },
-                        &generation,
-                    )
+                    app.lock()
+                        .unwrap()
+                        .with_browser_session(&browser_session, |guard| {
+                            guard.send_with_updates(
+                                data,
+                                &mut |delta| {
+                                    let event =
+                                        json!({"type":"delta","text":delta}).to_string() + "\n";
+                                    sender
+                                        .send(event.into_bytes())
+                                        .map_err(|_| "Browser disconnected".to_owned())
+                                },
+                                &generation,
+                            )
+                        })
                 });
                 if registered {
                     let mut current = active.lock().unwrap();
@@ -3359,7 +3426,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .ok_or_else(|| "Model upload size missing".to_owned())?;
                 app.lock()
                     .unwrap()
-                    .import_model(&name, request.as_reader(), length)
+                    .with_browser_session(browser_session.as_deref().unwrap(), |guard| {
+                        guard.import_model(&name, request.as_reader(), length)
+                    })
             });
             match result {
                 Ok(v) => (200, "application/json", serde_json::to_vec(&v).unwrap()),
@@ -3395,15 +3464,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .as_str()
                                 .ok_or_else(|| "Modello mancante".to_owned())
                                 .and_then(|model_id| start_hub_download(app.clone(), model_id))
+                                .and_then(|_| {
+                                    app.lock().unwrap().with_browser_session(
+                                        browser_session.as_deref().unwrap(),
+                                        |guard| Ok(guard.state()),
+                                    )
+                                })
                         } else if action == "download-model" {
                             v["modelId"]
                                 .as_str()
                                 .ok_or_else(|| "Scegli un modello".to_owned())
                                 .and_then(|model_id| start_download(app.clone(), model_id))
+                                .and_then(|_| {
+                                    app.lock().unwrap().with_browser_session(
+                                        browser_session.as_deref().unwrap(),
+                                        |guard| Ok(guard.state()),
+                                    )
+                                })
                         } else {
                             app.try_lock()
                                 .map_err(|_| "Busy".to_owned())
-                                .and_then(|mut guard| guard.command(&action, v))
+                                .and_then(|mut guard| {
+                                    guard.with_browser_session(
+                                        browser_session.as_deref().unwrap(),
+                                        |guard| guard.command(&action, v),
+                                    )
+                                })
                         }
                     }
                     Err(e) => Err(e.to_string()),
@@ -3415,7 +3501,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .and_then(|(raw_chat_id, raw_name)| {
                         let chat_id = decode_name(raw_chat_id)?;
                         let name = decode_name(raw_name)?;
-                        app.lock().unwrap().upload(&chat_id, &name, &body)
+                        app.lock()
+                            .unwrap()
+                            .with_browser_session(browser_session.as_deref().unwrap(), |guard| {
+                                guard.upload(&chat_id, &name, &body)
+                            })
                     })
             };
             match result {
@@ -3442,6 +3532,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn browser_sessions_keep_chats_and_documents_separate() {
+        let root = env::temp_dir().join(format!("llamanest-session-test-{}", id()));
+        fs::create_dir_all(&root).unwrap();
+        let mut app = App {
+            root: root.clone(),
+            models: root.join("models"),
+            db: Workspace::default(),
+            selected: None,
+            catalog: model_catalog(),
+            hardware: Hardware {
+                os: "windows",
+                arch: "x86_64",
+                logical_cores: 4,
+                ram_gb: Some(16.0),
+            },
+            downloading: None,
+            download_error: None,
+            inference: None,
+            quantization: None,
+            session_id: None,
+        };
+        let a = "a".repeat(64);
+        let b = "b".repeat(64);
+        let chat = app
+            .with_browser_session(&a, |app| app.command("new-chat", json!({})))
+            .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        app.with_browser_session(&a, |app| app.upload(&chat, "secret.txt", b"Secret for A"))
+            .unwrap();
+        let state_b = app.with_browser_session(&b, |app| Ok(app.state())).unwrap();
+        assert_eq!(state_b["chats"].as_array().unwrap().len(), 0);
+        assert_eq!(state_b["documents"].as_array().unwrap().len(), 0);
+        assert!(app
+            .with_browser_session(&b, |app| app.upload(&chat, "other.txt", b"wrong browser"))
+            .is_err());
+        app.with_browser_session(&b, |app| app.command("delete-chat", json!({"id":chat})))
+            .unwrap();
+        let state_a = app.with_browser_session(&a, |app| Ok(app.state())).unwrap();
+        assert_eq!(state_a["chats"].as_array().unwrap().len(), 1);
+        assert_eq!(state_a["documents"].as_array().unwrap().len(), 1);
+        assert!(app
+            .with_browser_session("../invalid", |app| Ok(app.state()))
+            .is_err());
+        assert!(app.db.chats.is_empty());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[cfg(unix)]
     #[test]
@@ -3657,6 +3797,7 @@ mod tests {
             download_error: None,
             inference: None,
             quantization: None,
+            session_id: None,
         };
         let state = app.state();
         assert!(state["models"]
@@ -3698,6 +3839,7 @@ mod tests {
             download_error: None,
             inference: None,
             quantization: None,
+            session_id: None,
         };
         app.import_model(second, &mut io::Cursor::new(b"GGUFsecond"), 10)
             .unwrap();
@@ -3735,6 +3877,7 @@ mod tests {
             download_error: None,
             inference: None,
             quantization: None,
+            session_id: None,
         };
         assert_eq!(app.download_status()["bytes"], 5);
         fs::remove_dir_all(root).unwrap();
@@ -3761,6 +3904,7 @@ mod tests {
             download_error: None,
             inference: None,
             quantization: None,
+            session_id: None,
         };
         assert!(app.register_external_model(&invalid).is_err());
         assert!(app.db.external_models.is_empty());
@@ -3817,6 +3961,7 @@ mod tests {
             download_error: None,
             inference: None,
             quantization: None,
+            session_id: None,
         };
         app.register_external_model(&old_file).unwrap();
         assert_eq!(
@@ -3843,6 +3988,7 @@ mod tests {
             download_error: None,
             inference: None,
             quantization: None,
+            session_id: None,
         };
         let mut good = io::Cursor::new(b"GGUFtest");
         let state = app.import_model("Local.GGUF", &mut good, 8).unwrap();
@@ -4067,6 +4213,7 @@ mod tests {
             download_error: None,
             inference: None,
             quantization: None,
+            session_id: None,
         };
         assert_eq!(app.state()["language"], "en");
         #[cfg(unix)]
@@ -4325,6 +4472,7 @@ mod tests {
             download_error: None,
             inference: None,
             quantization: None,
+            session_id: None,
         };
         let chat_id = app.command("new-chat", json!({})).unwrap()["id"]
             .as_str()
@@ -4375,6 +4523,7 @@ mod tests {
             download_error: None,
             inference: None,
             quantization: None,
+            session_id: None,
         };
         let first = app.command("new-chat", json!({})).unwrap()["id"]
             .as_str()
@@ -4573,6 +4722,7 @@ mod tests {
             download_error: None,
             inference: None,
             quantization: None,
+            session_id: None,
         };
         let state = app.state();
         assert_eq!(state["catalog"].as_array().unwrap().len(), 1);
