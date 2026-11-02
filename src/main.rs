@@ -741,6 +741,7 @@ struct App {
 
 struct InferenceServer {
     model: PathBuf,
+    engine: &'static str,
     port: u16,
     child: Child,
 }
@@ -1490,8 +1491,27 @@ impl App {
     fn inference_engine(&self) -> &'static str {
         if self.prism_only() || self.db.inference_engine == "prism" {
             "prism"
+        } else if self.db.inference_engine == "auto" {
+            "auto"
         } else {
             "standard"
+        }
+    }
+    fn engine_for_model(&self, model: &Path) -> &'static str {
+        match self.inference_engine() {
+            "auto" => {
+                let name = model
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_ascii_lowercase();
+                if name.contains("bonsai-2") || name.contains("bonsai_2") {
+                    "prism"
+                } else {
+                    "standard"
+                }
+            }
+            engine => engine,
         }
     }
     fn language(&self) -> &'static str {
@@ -1872,7 +1892,7 @@ impl App {
             }
             "set-inference-engine" => {
                 let engine = data["engine"].as_str().ok_or("Missing inference engine")?;
-                if !["standard", "prism"].contains(&engine) {
+                if !["auto", "standard", "prism"].contains(&engine) {
                     return Err("Invalid inference engine".into());
                 }
                 if self.prism_only() && engine != "prism" {
@@ -2262,10 +2282,11 @@ impl App {
         if generation.cancelled.load(Ordering::SeqCst) {
             return Ok((String::new(), None));
         }
+        let selected_engine = self.engine_for_model(model);
         if self
             .inference
             .as_ref()
-            .is_some_and(|server| server.model != model)
+            .is_some_and(|server| server.model != model || server.engine != selected_engine)
         {
             self.inference = None;
         }
@@ -2291,7 +2312,7 @@ impl App {
                     .map_err(|e| format!("llama-server: {e}"))?;
                 let port = listener.local_addr().map_err(|e| e.to_string())?.port();
                 drop(listener);
-                let prism = self.inference_engine() == "prism";
+                let prism = self.engine_for_model(model) == "prism";
                 let server_path = if prism {
                     prism_server_path().ok_or("PrismML engine is not installed")?
                 } else {
@@ -2341,6 +2362,7 @@ impl App {
                 };
                 self.inference = Some(InferenceServer {
                     model: model.to_path_buf(),
+                    engine: selected_engine,
                     port,
                     child,
                 });
@@ -4222,6 +4244,7 @@ mod tests {
             let pid = child.id();
             app.inference = Some(InferenceServer {
                 model: root.join("test.gguf"),
+                engine: "standard",
                 port: 1,
                 child,
             });
@@ -4273,6 +4296,17 @@ mod tests {
             .is_err());
 
         assert_eq!(app.state()["inferenceEngine"], "standard");
+        app.command("set-inference-engine", json!({"engine":"auto"}))
+            .unwrap();
+        assert_eq!(
+            app.engine_for_model(Path::new("Ternary-Bonsai-2-2B-PQ2_0.gguf")),
+            "prism"
+        );
+        assert_eq!(
+            app.engine_for_model(Path::new("Llama-3.2-1B-Q4.gguf")),
+            "standard"
+        );
+        assert_eq!(app.state()["inferenceEngine"], "auto");
         assert!(app
             .command("set-inference-engine", json!({"engine":"invalid"}))
             .is_err());

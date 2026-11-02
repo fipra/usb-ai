@@ -12,12 +12,14 @@ if not defined USB_AI_BIND_ADDR set "USB_AI_BIND_ADDR=127.0.0.1"
 set "USB_AI_GPU="
 set "USB_AI_REQUIRE_GPU="
 set "LLAMA_PRISM_SERVER=%~dp0bin\prism\llama-server.exe"
+set "LLAMA_SERVER=%~dp0bin\standard\llama-server.exe"
 set "GPU_SERVER=%~dp0bin\prism\vulkan\llama-server.exe"
 if "%LLAMANEST_PRISM_CPU%"=="1" goto start
 if not exist "%GPU_SERVER%" goto start
 "%GPU_SERVER%" --list-devices 2>nul | findstr /C:"Vulkan" >nul
 if errorlevel 1 goto start
 set "LLAMA_PRISM_SERVER=%GPU_SERVER%"
+if exist "%~dp0bin\standard\vulkan\llama-server.exe" set "LLAMA_SERVER=%~dp0bin\standard\vulkan\llama-server.exe"
 set "USB_AI_GPU=1"
 :start
 echo Starting LlamaNest. Keep this window open while using the app.
