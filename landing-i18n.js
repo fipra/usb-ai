@@ -1,6 +1,7 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Indirizzi IP unici", "Unique IP addresses", "Adresses IP uniques", "Eindeutige IP-Adressen", "Direcciones IP únicas"],
     ["Esplora l’AI con IBM", "Explore AI with IBM", "Explorez l’IA avec IBM", "KI mit IBM entdecken", "Explora la IA con IBM"],
     ["Scegli un video", "Choose a video", "Choisissez une vidéo", "Video auswählen", "Elige un vídeo"],
     ["Scorri per esplorare ·", "Scroll to explore ·", "Faites défiler pour explorer ·", "Zum Entdecken scrollen ·", "Desliza para explorar ·"],
