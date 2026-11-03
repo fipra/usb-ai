@@ -1,6 +1,7 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Per iniziare · For Dummies", "Getting started · For Dummies", "Pour commencer · For Dummies", "Für den Einstieg · For Dummies", "Para empezar · For Dummies"],
     ["NUOVO", "NEW", "NOUVEAU", "NEU", "NUEVO"],
     ["Scarica LlamaNest Astra per Mac Apple Silicon (sperimentale)", "Download LlamaNest Astra for Mac Apple Silicon (experimental)", "Télécharger LlamaNest Astra pour Mac Apple Silicon (expérimental)", "LlamaNest Astra für Mac Apple Silicon herunterladen (experimentell)", "Descargar LlamaNest Astra para Mac Apple Silicon (experimental)"],
     ["GPU Apple con MLX · Richiede Python 3.11–3.13 e Internet al primo avvio. Ricerca Safetensors su Hugging Face; esecuzione limitata ad Astra.", "Apple GPU with MLX · Requires Python 3.11–3.13 and Internet on first launch. Search Safetensors on Hugging Face; execution is limited to Astra.", "GPU Apple avec MLX · Python 3.11–3.13 et Internet requis au premier démarrage. Recherche Safetensors sur Hugging Face ; exécution limitée à Astra.", "Apple-GPU mit MLX · Benötigt Python 3.11–3.13 und Internet beim ersten Start. Safetensors-Suche auf Hugging Face; Ausführung nur für Astra.", "GPU de Apple con MLX · Requiere Python 3.11–3.13 e Internet al primer inicio. Búsqueda de Safetensors en Hugging Face; ejecución limitada a Astra."],
