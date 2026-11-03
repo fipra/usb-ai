@@ -52,3 +52,10 @@ test('a longer corrected response is available in full and survives memory expor
   assert.deepEqual(parseMemoryMarkdown(memoryMarkdown([note]), 16000), [note.text]);
   assert.deepEqual(parseMemoryMarkdown(memoryMarkdown([note])), []);
 });
+
+test('a correction is found using its original question and survives export', () => {
+  const text = 'Domanda: Qual è la capitale dell’Australia? Risposta corretta: Canberra';
+  const notes = [{ id:'correction', text, updated:1 }];
+  assert.match(memoryContext('Qual è la capitale dell’Australia?', notes, 16000), /Canberra/);
+  assert.deepEqual(parseMemoryMarkdown(memoryMarkdown(notes), 16000), [text]);
+});

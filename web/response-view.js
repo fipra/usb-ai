@@ -59,5 +59,13 @@
       flush() { if (frame !== null) cancelAnimationFrame(frame); paint(); }
     };
   }
-  window.USB_AI_RESPONSE_VIEW = { splitThinking, render, streamRenderer };
+  function correctionText(messages, index, language) {
+    const answer = splitThinking(messages[index]?.text).answer;
+    const question = messages.slice(0, index).reverse().find(message => message.role === 'user' && message.text?.trim())?.text.trim();
+    if (!question) return answer;
+    const labels = { en: ['Question', 'Corrected answer'], it: ['Domanda', 'Risposta corretta'], fr: ['Question', 'Réponse corrigée'], de: ['Frage', 'Korrigierte Antwort'], es: ['Pregunta', 'Respuesta corregida'] };
+    const [questionLabel, answerLabel] = labels[language] || labels.en;
+    return `${questionLabel}: ${question}\n\n${answerLabel}: ${answer}`;
+  }
+  window.USB_AI_RESPONSE_VIEW = { splitThinking, render, streamRenderer, correctionText };
 })();

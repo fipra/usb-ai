@@ -39,3 +39,15 @@ test('correction can use the complete visible answer without hidden reasoning', 
   assert.equal(result.answer, answer);
   assert.equal(result.thinking, 'private reasoning');
 });
+
+test('a correction includes the question that preceded this answer', () => {
+  const messages = [
+    { role:'user', text:'Qual è la capitale dell’Australia?' },
+    { role:'assistant', text:'<think>Hidden</think>Sydney' },
+    { role:'user', text:'E quella del Canada?' },
+    { role:'assistant', text:'Ottawa' }
+  ];
+  assert.equal(window.USB_AI_RESPONSE_VIEW.correctionText(messages, 1, 'it'), 'Domanda: Qual è la capitale dell’Australia?\n\nRisposta corretta: Sydney');
+  assert.equal(window.USB_AI_RESPONSE_VIEW.correctionText(messages, 3, 'en'), 'Question: E quella del Canada?\n\nCorrected answer: Ottawa');
+  assert.equal(window.USB_AI_RESPONSE_VIEW.correctionText([{role:'assistant', text:'Hello'}], 0, 'en'), 'Hello');
+});
