@@ -1,6 +1,10 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["NUOVO", "NEW", "NOUVEAU", "NEU", "NUEVO"],
+    ["Scarica LlamaNest Astra per Mac Apple Silicon (sperimentale)", "Download LlamaNest Astra for Mac Apple Silicon (experimental)", "Télécharger LlamaNest Astra pour Mac Apple Silicon (expérimental)", "LlamaNest Astra für Mac Apple Silicon herunterladen (experimentell)", "Descargar LlamaNest Astra para Mac Apple Silicon (experimental)"],
+    ["GPU Apple con MLX · Richiede Python 3.11–3.13 e Internet al primo avvio. Supporto Safetensors limitato ad Astra; ricerca di altri Safetensors non ancora disponibile.", "Apple GPU with MLX · Requires Python 3.11–3.13 and Internet on first launch. Safetensors support is limited to Astra; search for other Safetensors is not yet available.", "GPU Apple avec MLX · Python 3.11–3.13 et Internet requis au premier démarrage. Safetensors limité à Astra ; la recherche d’autres modèles Safetensors n’est pas encore disponible.", "Apple-GPU mit MLX · Benötigt Python 3.11–3.13 und Internet beim ersten Start. Safetensors-Unterstützung nur für Astra; die Suche nach weiteren Safetensors ist noch nicht verfügbar.", "GPU de Apple con MLX · Requiere Python 3.11–3.13 e Internet al primer inicio. Safetensors limitado a Astra; la búsqueda de otros Safetensors aún no está disponible."],
+    ["Dettagli della prova", "Experiment details", "Détails de l’essai", "Details zum Experiment", "Detalles de la prueba"],
     ["Indirizzi IP unici", "Unique IP addresses", "Adresses IP uniques", "Eindeutige IP-Adressen", "Direcciones IP únicas"],
     ["Esplora l’AI con IBM", "Explore AI with IBM", "Explorez l’IA avec IBM", "KI mit IBM entdecken", "Explora la IA con IBM"],
     ["Scegli un video", "Choose a video", "Choisissez une vidéo", "Video auswählen", "Elige un vídeo"],
