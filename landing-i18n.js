@@ -1,6 +1,10 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Esplora l’AI con IBM", "Explore AI with IBM", "Explorez l’IA avec IBM", "KI mit IBM entdecken", "Explora la IA con IBM"],
+    ["Scegli un video", "Choose a video", "Choisissez une vidéo", "Video auswählen", "Elige un vídeo"],
+    ["Scorri per esplorare ·", "Scroll to explore ·", "Faites défiler pour explorer ·", "Zum Entdecken scrollen ·", "Desliza para explorar ·"],
+    ["Altri video sul canale IBM Technology", "More videos on the IBM Technology channel", "Plus de vidéos sur la chaîne IBM Technology", "Weitere Videos auf dem Kanal IBM Technology", "Más vídeos en el canal IBM Technology"],
     ["Zona sperimentale per gli specialisti", "Experimental zone for specialists", "Zone expérimentale pour les spécialistes", "Experimentierbereich für Spezialisten", "Zona experimental para especialistas"],
     ["Prova LlamaNest Web sperimentale per GPU Intel", "Try experimental LlamaNest Web for Intel GPUs", "Essayer LlamaNest Web expérimental pour GPU Intel", "Experimentelles LlamaNest Web für Intel-GPUs testen", "Probar LlamaNest Web experimental para GPU Intel"],
     ["Scarica Windows Prism LAN sperimentale", "Download experimental Windows Prism LAN", "Télécharger Windows Prism LAN expérimental", "Experimentelles Windows Prism LAN herunterladen", "Descargar Windows Prism LAN experimental"],
@@ -139,6 +143,7 @@
   ];
 
   const attributes = [
+    ["Video IBM Technology sull’intelligenza artificiale", "IBM Technology videos about artificial intelligence", "Vidéos IBM Technology sur l’intelligence artificielle", "IBM Technology Videos über künstliche Intelligenz", "Vídeos de IBM Technology sobre inteligencia artificial"],
     ["LlamaNest, torna all'inizio", "LlamaNest, back to top", "LlamaNest, retour en haut", "LlamaNest, zurück nach oben", "LlamaNest, volver arriba"],
     ["Volpe, simbolo di LlamaNest", "Fox, LlamaNest symbol", "Renard, symbole de LlamaNest", "Fuchs, Symbol von LlamaNest", "Zorro, símbolo de LlamaNest"],
     ["Navigazione principale", "Main navigation", "Navigation principale", "Hauptnavigation", "Navegación principal"],

@@ -60,6 +60,7 @@
     .video-player{position:relative;aspect-ratio:16/9;background:#171b19;border-radius:14px;overflow:hidden}
     .video-player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
     .video-card-body{padding:19px 5px 6px}.video-card-body h2{font-size:clamp(20px,2.2vw,26px);line-height:1.15;letter-spacing:-.045em;margin:0 0 9px}.video-card-body p{font-size:14px;line-height:1.55;color:#68716c;margin:0}.video-card-meta{display:flex;align-items:center;gap:8px;margin-top:16px;color:#758078;font-size:12px;font-weight:650}.video-card-meta span:first-child{color:#43775a}
+    .video-gallery-label{font-size:12px;font-weight:750;color:#53675a;margin:18px 0 9px}.video-gallery{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 0 8px;scrollbar-width:thin}.video-choice{flex:0 0 145px;scroll-snap-align:start;color:#303938;text-decoration:none;font-size:12px;font-weight:700;line-height:1.35;border-radius:10px;outline-offset:3px}.video-choice img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:9px;display:block;margin-bottom:6px;background:#e8ece8}.video-choice[aria-current="true"]{color:#277247}.video-choice[aria-current="true"] img{outline:3px solid #70a781;outline-offset:-3px}.video-gallery-hint{font-size:11px;color:#758078;margin:5px 0 0}.video-card-meta a{color:inherit;text-decoration:underline}
     .section{padding:100px 0;border-top:1px solid var(--line)}
     .section-head{max-width:660px;margin-bottom:42px}.kicker{font-size:11px;color:#936c52;font-weight:800;letter-spacing:.15em;text-transform:uppercase}.section h2{font-size:clamp(35px,4vw,52px);line-height:1.08;letter-spacing:-.065em;margin:14px 0 15px;font-weight:740}.section-head p{color:var(--muted);font-size:16px;line-height:1.65;margin:0}
     .download-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
@@ -113,9 +114,17 @@
       </div>
       <div class="preview-stage">
         <article class="video-card" aria-labelledby="daily-video-title">
-          <div class="video-card-head"><span class="video-card-kicker">Il video del giorno</span><span class="video-card-tag">AI · 01</span></div>
-          <div class="video-player"><iframe src="https://www.youtube-nocookie.com/embed/mmns33BsBcY" title="IBM Technology – What Is Quantization? How AI Models Get Smaller &amp; Faster" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
+          <div class="video-card-head"><span class="video-card-kicker">Esplora l’AI con IBM</span><span class="video-card-tag">IBM Technology</span></div>
+          <div class="video-player"><iframe name="ibm-video-player" id="ibm-video-player" src="https://www.youtube-nocookie.com/embed/mmns33BsBcY" title="IBM Technology – What Is Quantization? How AI Models Get Smaller &amp; Faster" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
           <div class="video-card-body"><h2 id="daily-video-title">Cos’è la quantizzazione?</h2><p>Scopri come i modelli AI diventano più piccoli e veloci, e cosa cambia nella loro precisione.</p><div class="video-card-meta"><span>IBM Technology</span><span aria-hidden="true">·</span><span>Video in inglese</span></div></div>
+          <p class="video-gallery-label">Scegli un video</p>
+          <div class="video-gallery" aria-label="Video IBM Technology sull’intelligenza artificiale">
+            <a class="video-choice" href="https://www.youtube-nocookie.com/embed/mmns33BsBcY" target="ibm-video-player" aria-current="true"><img src="https://i.ytimg.com/vi/mmns33BsBcY/mqdefault.jpg" alt="" loading="lazy"><span>What Is Quantization?</span></a>
+            <a class="video-choice" href="https://www.youtube-nocookie.com/embed/615-yWyS1n0" target="ibm-video-player"><img src="https://i.ytimg.com/vi/615-yWyS1n0/mqdefault.jpg" alt="" loading="lazy"><span>What Is LLM Inference?</span></a>
+            <a class="video-choice" href="https://www.youtube-nocookie.com/embed/jmmW0F0biz0" target="ibm-video-player"><img src="https://i.ytimg.com/vi/jmmW0F0biz0/mqdefault.jpg" alt="" loading="lazy"><span>Neural Networks Explained</span></a>
+            <a class="video-choice" href="https://www.youtube-nocookie.com/embed/YGgNBcIgI4s" target="ibm-video-player"><img src="https://i.ytimg.com/vi/YGgNBcIgI4s/mqdefault.jpg" alt="" loading="lazy"><span>What Is Jev?</span></a>
+          </div>
+          <p class="video-gallery-hint">Scorri per esplorare · <a href="https://www.youtube.com/@IBMTechnology/videos" target="_blank" rel="noopener noreferrer">Altri video sul canale IBM Technology</a></p>
         </article>
       </div>
     </section>
@@ -175,7 +184,8 @@
   </main>
 
   <footer class="footer"><div class="wrap footer-inner"><div class="footer-brand"><strong>FipraAI</strong> · un progetto di Fabrizio Casula<br>© 2026 Fabrizio Casula · Copie precedenti MIT; distribuzioni future con licenza per uso personale</div><address class="footer-contact"><strong>Contatti</strong><span>FipraAI</span><br><span>Leimgrubenweg 16</span><br><span>4102 Binningen</span><br><span>Svizzera</span><br><a href="tel:+41786497371">+41 78 649 73 71</a><br><a href="mailto:fabrizio.casula@gmail.com">fabrizio.casula@gmail.com</a></address><nav class="footer-links" aria-label="Link utili"><a href="https://github.com/fipra/usb-ai" target="_blank" rel="noopener noreferrer">Codice su GitHub</a><a href="https://github.com/fipra/usb-ai/releases/tag/rust-mac-stop-2026-10-24" target="_blank" rel="noopener noreferrer">Release Mac</a><a href="https://github.com/fipra/usb-ai/releases/tag/rust-windows-stop-2026-10-24" target="_blank" rel="noopener noreferrer">Release Windows</a></nav></div></footer>
-  <script src="landing-i18n.js?v=experimental-title1"></script>
+  <script src="landing-i18n.js?v=video-gallery1"></script>
+  <script src="landing-video-gallery.js?v=1"></script>
   <script src="landing-mobile-gate.js?v=phonegate2"></script>
 </body>
 </html>
