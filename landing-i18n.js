@@ -1,6 +1,7 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Zona sperimentale per gli specialisti", "Experimental zone for specialists", "Zone expérimentale pour les spécialistes", "Experimentierbereich für Spezialisten", "Zona experimental para especialistas"],
     ["Prova LlamaNest Web sperimentale per GPU Intel", "Try experimental LlamaNest Web for Intel GPUs", "Essayer LlamaNest Web expérimental pour GPU Intel", "Experimentelles LlamaNest Web für Intel-GPUs testen", "Probar LlamaNest Web experimental para GPU Intel"],
     ["Scarica Windows Prism LAN sperimentale", "Download experimental Windows Prism LAN", "Télécharger Windows Prism LAN expérimental", "Experimentelles Windows Prism LAN herunterladen", "Descargar Windows Prism LAN experimental"],
     ["Chat e documenti separati per browser, salvati sul server; solo per reti fidate.", "Chats and documents are separated by browser and saved on the server; trusted networks only.", "Discussions et documents séparés par navigateur, enregistrés sur le serveur ; réseaux de confiance uniquement.", "Chats und Dokumente pro Browser getrennt auf dem Server gespeichert; nur für vertrauenswürdige Netzwerke.", "Chats y documentos separados por navegador, guardados en el servidor; solo redes de confianza."],
