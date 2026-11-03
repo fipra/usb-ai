@@ -31,3 +31,11 @@ test('thinking stays collapsed and token metrics remain under the final answer',
 test('unfinished thinking does not leak into the answer', () => {
   assert.deepEqual(window.USB_AI_RESPONSE_VIEW.splitThinking('<think>working'), {answer:'',thinking:'working'});
 });
+
+
+test('correction can use the complete visible answer without hidden reasoning', () => {
+  const answer = 'First part ' + 'x'.repeat(900) + ' corrected ending';
+  const result = window.USB_AI_RESPONSE_VIEW.splitThinking(`<think>private reasoning</think>${answer}`);
+  assert.equal(result.answer, answer);
+  assert.equal(result.thinking, 'private reasoning');
+});

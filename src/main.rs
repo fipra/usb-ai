@@ -2002,8 +2002,8 @@ impl App {
             }
             "save-memory" => {
                 let text = data["text"].as_str().ok_or("Memory text missing")?.trim();
-                if text.is_empty() || text.chars().count() > 500 || text.contains('\n') {
-                    return Err("Memory note must be one line of at most 500 characters".into());
+                if text.is_empty() || text.chars().count() > 16_000 || text.contains('\n') {
+                    return Err("Memory note must be one line of at most 16000 characters".into());
                 }
                 let note_id = data["id"].as_str().unwrap_or("");
                 if let Some(note) = self.db.memory.iter_mut().find(|note| note.id == note_id) {
@@ -4238,6 +4238,18 @@ mod tests {
         assert!(app
             .command("save-memory", json!({"text":"bad\nnote"}))
             .is_err());
+        let long_note = format!("Atlas {} fine correzione", "x".repeat(900));
+        app.command("save-memory", json!({"text": long_note}))
+            .unwrap();
+        let saved: Workspace =
+            serde_json::from_slice(&fs::read(root.join("workspace.json")).unwrap()).unwrap();
+        assert!(memory_context("Atlas", &saved.memory).contains("fine correzione"));
+        assert!(app
+            .command("save-memory", json!({"text": "x".repeat(16_001)}))
+            .is_err());
+        let long_id = app.db.memory.last().unwrap().id.clone();
+        app.command("delete-memory", json!({"id":long_id})).unwrap();
+
         let note_id = app.db.memory[0].id.clone();
         app.command("delete-memory", json!({"id":note_id})).unwrap();
         assert!(app.db.memory.is_empty());

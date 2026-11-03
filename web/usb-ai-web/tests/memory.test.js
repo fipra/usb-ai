@@ -43,3 +43,12 @@ test('a saved fact is available when the follow-up names its subject', () => {
   assert.deepEqual(identityMemoryNotes('Chi è Nora?', [{ id:'nora', text:note, updated:1 }]), []);
   assert.deepEqual(identityMemoryNotes('Chi è Luca Bianchi?', [{ id:'nora', text:note, updated:1 }]), []);
 });
+
+
+test('a longer corrected response is available in full and survives memory export', () => {
+  const note = { id:'long', text: 'Atlas ' + 'a'.repeat(900) + ' correzione finale', updated:1 };
+  assert.match(memoryContext('Atlas', [note], 16000), /correzione finale/);
+  assert.doesNotMatch(memoryContext('Atlas', [note]), /correzione finale/);
+  assert.deepEqual(parseMemoryMarkdown(memoryMarkdown([note]), 16000), [note.text]);
+  assert.deepEqual(parseMemoryMarkdown(memoryMarkdown([note])), []);
+});

@@ -385,3 +385,7 @@ const memoryErrorStrings = {
  es: 'No hay memoria suficiente para usar el modelo. Reduce la ventana de contexto a 4.096 u 8.192 tokens y vuelve a cargar el modelo. Si es necesario, cierra otras pestañas o aplicaciones.'
 };
 for (const language of Object.keys(memoryErrorStrings)) translations[language].gpuOutOfMemory = memoryErrorStrings[language];
+
+
+const correctionLengthStrings = {"en": "Edit the response before saving. Notes can contain up to 16,000 characters.", "it": "Modifica la risposta prima di salvarla. Le note possono contenere fino a 16.000 caratteri.", "fr": "Modifiez la réponse avant de l’enregistrer. Les notes peuvent contenir jusqu’à 16 000 caractères.", "de": "Bearbeite die Antwort vor dem Speichern. Notizen können bis zu 16.000 Zeichen enthalten.", "es": "Edita la respuesta antes de guardarla. Las notas pueden contener hasta 16.000 caracteres."};
+for (const language of Object.keys(correctionLengthStrings)) translations[language].memoryLengthHint = correctionLengthStrings[language];
