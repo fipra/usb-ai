@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [.github/workflows/mac-prism-math.yml]
+    paths: [.github/workflows/mac-prism-math.yml, 'src/**', 'web/**', 'Cargo.toml', 'Cargo.lock']
 permissions:
   contents: write
 jobs:
@@ -51,5 +51,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          tag=prism-lan-mac-filter-2026-11-02
-          gh release create "$tag" LlamaNest-Prism-LAN-mac-arm64.zip --target "$GITHUB_SHA" --title 'LlamaNest Prism Mac con formule matematiche' --notes 'LlamaNest Prism per Mac Apple Silicon con formattazione delle formule in locale e avvio LAN opzionale.'
+          tag=prism-lan-mac-math-2026-11-02
+          gh release upload "$tag" LlamaNest-Prism-LAN-mac-arm64.zip --clobber
