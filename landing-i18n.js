@@ -1,6 +1,7 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Versione con prompt: modifiche predefinite, non esegue funzioni generate", "Prompt version: predefined edits only; generated functions are not executed", "Version avec prompt : modifications prédéfinies, les fonctions générées ne sont pas exécutées", "Version mit Prompt: vordefinierte Änderungen, generierte Funktionen werden nicht ausgeführt", "Versión con prompt: cambios predefinidos, no ejecuta funciones generadas"],
     ["Versione corretta: installa accelerate", "Fixed version: installs accelerate", "Version corrigée : installe accelerate", "Korrigierte Version: installiert accelerate", "Versión corregida: instala accelerate"],
     ["Esperimenti", "Experiments", "Expériences", "Experimente", "Experimentos"],
     ["Prototipi per utenti esperti: possono richiedere configurazione e non sono versioni definitive.", "Prototypes for experienced users: they may require setup and are not final releases.", "Prototypes pour utilisateurs expérimentés : ils peuvent nécessiter une configuration et ne sont pas des versions définitives.", "Prototypen für erfahrene Nutzer: Sie können Einrichtung erfordern und sind keine endgültigen Versionen.", "Prototipos para usuarios expertos: pueden requerir configuración y no son versiones definitivas."],
