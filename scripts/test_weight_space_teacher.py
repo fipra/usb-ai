@@ -2,6 +2,15 @@ import unittest
 from weight_space_teacher import extract_json, propose
 
 class TeacherTests(unittest.TestCase):
+    def test_retry_preserves_invalid_response(self):
+        name = 'model.layers.0.mlp.down_proj.weight'
+        valid = '{"operations":[{"type":"scale_columns","tensor":"' + name + '","columns":[0],"factor":1.0}]}'
+        answers = iter(['not JSON', valid])
+        saved = []
+        plan = propose([], [], lambda _: next(answers), {name: [2, 3]}, 'test', lambda n, s: saved.append((n, s)))
+        self.assertEqual(saved, [(1, 'not JSON'), (2, valid)])
+        self.assertEqual(plan['operations'][0]['factor'], 1.0)
+
     def test_objective_reaches_teacher(self):
         name = 'model.layers.0.mlp.down_proj.weight'
         plan = '{"operations":[{"type":"scale_columns","tensor":"' + name + '","columns":[0],"factor":1.0}]}'
