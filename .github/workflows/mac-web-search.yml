@@ -25,8 +25,13 @@ jobs:
         run: |
           curl -fL --retry 3 --connect-timeout 30 'https://huggingface.co/QuantFactory/SmolLM2-135M-Instruct-GGUF/resolve/476854d00ede130660aba430d15f9347ad2e7d0e/SmolLM2-135M-Instruct.Q4_K_M.gguf' -o "$RUNNER_TEMP/smoke.gguf"
           echo '8030f04528538d47bda434f6f0bdf3952c40a58123e4d5e755332f23731a8684  '"$RUNNER_TEMP/smoke.gguf" | shasum -a 256 -c -
+      - name: Build CPU-only inference for the virtual Mac test
+        run: |
+          git clone --depth 1 --branch b11836 https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama-cpu"
+          cmake -S "$RUNNER_TEMP/llama-cpu" -B "$RUNNER_TEMP/llama-cpu/build" -DCMAKE_BUILD_TYPE=Release -DGGML_METAL=OFF -DGGML_BLAS=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON
+          cmake --build "$RUNNER_TEMP/llama-cpu/build" --target llama-server -j 3
       - name: Exercise packaged local inference with web sources
-        run: python3 scripts/test-mac-web-search.py release/LlamaNest-Ricerca-Web-Mac-Apple-Silicon "$RUNNER_TEMP/smoke.gguf"
+        run: LLAMA_SEARCH_TEST_SERVER="$RUNNER_TEMP/llama-cpu/build/bin/llama-server" python3 scripts/test-mac-web-search.py release/LlamaNest-Ricerca-Web-Mac-Apple-Silicon "$RUNNER_TEMP/smoke.gguf"
       - name: Create portable ZIP
         run: ditto -c -k --sequesterRsrc --keepParent release/LlamaNest-Ricerca-Web-Mac-Apple-Silicon LlamaNest-Ricerca-Web-Mac-Apple-Silicon.zip
       - name: Publish experimental download

@@ -18,7 +18,8 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-test-') as temp:
     (root / 'models' / model.name).symlink_to(model)
     env = dict(os.environ, USB_AI_DIR=str(root), POCKET_AI_HOME=str(root / 'data'))
     wrapper = root / 'server-with-log'
-    wrapper.write_text('#!/bin/sh\nexec ' + shlex.quote(str(package / 'bin/llama-server')) + ' "$@" 2>>' + shlex.quote(str(root / 'app-server.log')) + '\n')
+    server_binary = os.environ.get('LLAMA_SEARCH_TEST_SERVER', str(package / 'bin/llama-server'))
+    wrapper.write_text('#!/bin/sh\nexec ' + shlex.quote(server_binary) + ' "$@" 2>>' + shlex.quote(str(root / 'app-server.log')) + '\n')
     wrapper.chmod(0o755)
     env['LLAMA_SERVER'] = str(wrapper)
     server = subprocess.Popen([str(package / 'bin/usb-ai-rust')], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
