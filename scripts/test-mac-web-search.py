@@ -13,6 +13,25 @@ package, model = map(lambda x: Path(x).resolve(), sys.argv[1:3])
 http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 with tempfile.TemporaryDirectory(prefix='llamanest-search-test-') as temp:
     root = Path(temp)
+    # Report the bundled inference server's own startup diagnostics if it fails.
+    log = root / 'llama-server.log'
+    with log.open('wb') as output:
+        probe = subprocess.Popen([str(package / 'bin/llama-server'), '--host', '127.0.0.1', '--port', '48091', '-m', str(model), '-c', '4096', '--no-webui', '--threads', '4', '--device', 'none', '-ngl', '0'], stdout=output, stderr=output)
+        try:
+            for _ in range(120):
+                if probe.poll() is not None:
+                    raise RuntimeError('Bundled llama-server failed to start: ' + log.read_text(errors='replace')[-6000:])
+                try:
+                    with http.open('http://127.0.0.1:48091/health', timeout=1) as response:
+                        if response.status == 200:
+                            break
+                except (OSError, urllib.error.URLError):
+                    time.sleep(.25)
+            else:
+                raise RuntimeError('Bundled llama-server did not become ready: ' + log.read_text(errors='replace')[-6000:])
+        finally:
+            probe.terminate()
+            probe.wait(timeout=10)
     (root / 'models').mkdir()
     (root / 'models' / model.name).symlink_to(model)
     env = dict(os.environ, USB_AI_DIR=str(root), POCKET_AI_HOME=str(root / 'data'))
@@ -39,6 +58,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-test-') as temp:
             except urllib.error.HTTPError as error:
                 raise RuntimeError(f'API error: {error.read().decode()}') from error
         post({'action':'set-inference-options', 'backend':'cpu', 'threads':4})
+        post({'action':'set-generation-options', 'contextSize':4096, 'outputLimit':1024, 'temperature':0})
         chat_id = post({'action':'new-chat'})['id']
         source = {'title':'Example source', 'url':'https://example.org/', 'description':'The capital of France is Paris.'}
         state = post({'action':'send', 'chatId':chat_id, 'text':'What is the capital of France? Answer briefly.', 'webSources':[source]}, timeout=600)
