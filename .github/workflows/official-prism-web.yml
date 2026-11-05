@@ -29,7 +29,7 @@ jobs:
           git -C "$RUNNER_TEMP/prism-src" remote add origin https://github.com/PrismML-Eng/llama.cpp.git
           git -C "$RUNNER_TEMP/prism-src" fetch --depth 1 origin 5628c7338963b00a598f2a588fd09a79af6d70db
           git -C "$RUNNER_TEMP/prism-src" checkout --detach FETCH_HEAD
-          cmake -S "$RUNNER_TEMP/prism-src" -B "$RUNNER_TEMP/prism-src/build" -DCMAKE_BUILD_TYPE=Release -DGGML_METAL=OFF -DGGML_BLAS=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=OFF -DLLAMA_BUILD_SERVER=ON
+          cmake -S "$RUNNER_TEMP/prism-src" -B "$RUNNER_TEMP/prism-src/build" -DCMAKE_BUILD_TYPE=Release -DGGML_METAL=OFF -DGGML_BLAS=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON
           cmake --build "$RUNNER_TEMP/prism-src/build" --target llama-server -j 3
       - name: Test Prism inference and web sources
         run: python3 scripts/test-official-prism-web.py release/LlamaNest-Prism-Ricerca-Web-Mac-Apple-Silicon "$RUNNER_TEMP/smoke.gguf" "$RUNNER_TEMP/prism-src/build/bin/llama-server"
