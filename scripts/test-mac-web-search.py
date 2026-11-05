@@ -46,6 +46,11 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-test-') as temp:
                 diagnostic = (root / 'app-server.log').read_text(errors='replace')[-6000:] if (root / 'app-server.log').exists() else ''
                 raise RuntimeError(f'API error: {error.read().decode()}\nServer log: {diagnostic}') from error
         post({'action':'set-inference-options', 'backend':'cpu', 'threads':4})
+        state = post({'action':'state'})
+        assert state['prismAvailable'], 'PrismML engine is missing from the package'
+        prism_state = post({'action':'set-inference-engine', 'engine':'prism'})
+        assert prism_state['inferenceEngine'] == 'prism', prism_state
+        post({'action':'set-inference-engine', 'engine':'standard'})
         post({'action':'set-generation-options', 'contextSize':4096, 'outputLimit':1024, 'temperature':0})
         chat_id = post({'action':'new-chat'})['id']
         source = {'title':'Example source', 'url':'https://example.org/', 'description':'The capital of France is Paris.'}
