@@ -9,11 +9,11 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 TEXT = {
- 'it': ['Esperimento pesi · Windows','Modifica diretta senza fine-tuning. La chat resta separata. I dati rimangono locali.','Modello piccolo GGUF','Modello grande GGUF','Domande di analisi JSON','Domande di verifica JSON','Convertitore Hugging Face → GGUF','llama-cli con GPU','llama-quantize','Cartella dei risultati (nuova)','Sfoglia','Avvia esperimento','Interrompi','Stato','Pronto','In corso…','Terminato. Controlla report.json e la qualità delle risposte.','Errore: controlla il log.','Scegli tutti i file e una nuova cartella.','Il modello grande è caricato in un processo separato durante l’analisi. Questa funzione non garantisce miglioramenti.'],
- 'en': ['Weight experiment · Windows','Direct weight edits without fine-tuning. Chat stays separate. Data stays local.','Small GGUF model','Large GGUF model','Calibration questions JSON','Test questions JSON','Hugging Face → GGUF converter','llama-cli with GPU','llama-quantize','Results folder (new)','Browse','Start experiment','Stop','Status','Ready','Running…','Finished. Review report.json and answer quality.','Error: check the log.','Choose all files and a new folder.','The large model runs in a separate process during analysis. Improvement is not guaranteed.'],
- 'de': ['Gewichtsexperiment · Windows','Direkte Gewichtsänderung ohne Fine-Tuning. Der Chat bleibt getrennt. Daten bleiben lokal.','Kleines GGUF-Modell','Großes GGUF-Modell','Analysefragen JSON','Testfragen JSON','Hugging Face → GGUF Konverter','llama-cli mit GPU','llama-quantize','Ergebnisordner (neu)','Auswählen','Experiment starten','Stoppen','Status','Bereit','Läuft…','Fertig. report.json und Antwortqualität prüfen.','Fehler: Protokoll prüfen.','Alle Dateien und einen neuen Ordner wählen.','Das große Modell läuft während der Analyse separat. Eine Verbesserung ist nicht garantiert.'],
- 'fr': ['Expérience des poids · Windows','Modification directe sans fine-tuning. Le chat reste séparé. Les données restent locales.','Petit modèle GGUF','Grand modèle GGUF','Questions d’analyse JSON','Questions de test JSON','Convertisseur Hugging Face → GGUF','llama-cli avec GPU','llama-quantize','Dossier des résultats (nouveau)','Parcourir','Lancer l’expérience','Arrêter','Statut','Prêt','En cours…','Terminé. Vérifiez report.json et les réponses.','Erreur : consultez le journal.','Choisissez tous les fichiers et un nouveau dossier.','Le grand modèle fonctionne dans un processus séparé pendant l’analyse. Une amélioration n’est pas garantie.'],
- 'es': ['Experimento de pesos · Windows','Edición directa sin ajuste fino. El chat queda separado. Los datos permanecen locales.','Modelo pequeño GGUF','Modelo grande GGUF','Preguntas de análisis JSON','Preguntas de prueba JSON','Conversor Hugging Face → GGUF','llama-cli con GPU','llama-quantize','Carpeta de resultados (nueva)','Examinar','Iniciar experimento','Detener','Estado','Listo','En curso…','Terminado. Revisa report.json y las respuestas.','Error: revisa el registro.','Elige todos los archivos y una carpeta nueva.','El modelo grande se ejecuta en otro proceso durante el análisis. No se garantiza una mejora.']}
+ 'it': ['Esperimento pesi · Windows','Prototipo: il modello grande propone solo modifiche limitate e predefinite. Non esegue funzioni generate.','Modello piccolo GGUF','Modello grande GGUF','Domande di analisi JSON','Domande di verifica JSON','Convertitore Hugging Face → GGUF','llama-cli con GPU','llama-quantize','Cartella dei risultati (nuova)','Sfoglia','Avvia esperimento','Interrompi','Stato','Pronto','In corso…','Terminato. Controlla report.json e la qualità delle risposte.','Errore: controlla il log.','Scegli tutti i file e una nuova cartella.','Il modello grande è caricato in un processo separato durante l’analisi. Questa funzione non garantisce miglioramenti.'],
+ 'en': ['Weight experiment · Windows','Prototype: the large model proposes limited predefined edits only. Generated functions are not executed.','Small GGUF model','Large GGUF model','Calibration questions JSON','Test questions JSON','Hugging Face → GGUF converter','llama-cli with GPU','llama-quantize','Results folder (new)','Browse','Start experiment','Stop','Status','Ready','Running…','Finished. Review report.json and answer quality.','Error: check the log.','Choose all files and a new folder.','The large model runs in a separate process during analysis. Improvement is not guaranteed.'],
+ 'de': ['Gewichtsexperiment · Windows','Prototyp: Das große Modell schlägt nur begrenzte vordefinierte Änderungen vor. Generierte Funktionen werden nicht ausgeführt.','Kleines GGUF-Modell','Großes GGUF-Modell','Analysefragen JSON','Testfragen JSON','Hugging Face → GGUF Konverter','llama-cli mit GPU','llama-quantize','Ergebnisordner (neu)','Auswählen','Experiment starten','Stoppen','Status','Bereit','Läuft…','Fertig. report.json und Antwortqualität prüfen.','Fehler: Protokoll prüfen.','Alle Dateien und einen neuen Ordner wählen.','Das große Modell läuft während der Analyse separat. Eine Verbesserung ist nicht garantiert.'],
+ 'fr': ['Expérience des poids · Windows','Prototype : le grand modèle propose uniquement des modifications prédéfinies limitées. Les fonctions générées ne sont pas exécutées.','Petit modèle GGUF','Grand modèle GGUF','Questions d’analyse JSON','Questions de test JSON','Convertisseur Hugging Face → GGUF','llama-cli avec GPU','llama-quantize','Dossier des résultats (nouveau)','Parcourir','Lancer l’expérience','Arrêter','Statut','Prêt','En cours…','Terminé. Vérifiez report.json et les réponses.','Erreur : consultez le journal.','Choisissez tous les fichiers et un nouveau dossier.','Le grand modèle fonctionne dans un processus séparé pendant l’analyse. Une amélioration n’est pas garantie.'],
+ 'es': ['Experimento de pesos · Windows','Prototipo: el modelo grande solo propone cambios predefinidos y limitados. No ejecuta funciones generadas.','Modelo pequeño GGUF','Modelo grande GGUF','Preguntas de análisis JSON','Preguntas de prueba JSON','Conversor Hugging Face → GGUF','llama-cli con GPU','llama-quantize','Carpeta de resultados (nueva)','Examinar','Iniciar experimento','Detener','Estado','Listo','En curso…','Terminado. Revisa report.json y las respuestas.','Error: revisa el registro.','Elige todos los archivos y una carpeta nueva.','El modelo grande se ejecuta en otro proceso durante el análisis. No se garantiza una mejora.']}
 
 class App:
     def __init__(self, root):
@@ -40,6 +40,8 @@ class App:
         language = ttk.Combobox(toolbar, textvariable=self.lang, values=['it','en','de','fr','es'], state='readonly', width=5)
         language.pack(side='right'); language.bind('<<ComboboxSelected>>', lambda _: self.translate())
         self.intro = ttk.Label(root, wraplength=760); self.intro.pack(anchor='w', padx=16)
+        self.objective_label = ttk.Label(root); self.objective_label.pack(anchor='w', padx=16, pady=(8,0))
+        self.objective = tk.Text(root, height=3, wrap='word'); self.objective.pack(fill='x', padx=16)
         panel = ttk.Frame(root, padding=16); panel.pack(fill='x')
         self.labels, self.browsers = [], []
         for i, value in enumerate(self.fields):
@@ -58,6 +60,7 @@ class App:
         self.translate(); root.after(100, self.poll)
 
     def translate(self):
+        self.objective_label.config(text={'it':'Obiettivo della modifica (prompt)', 'en':'Edit objective (prompt)', 'fr':'Objectif de la modification (prompt)', 'de':'Ziel der Änderung (Prompt)', 'es':'Objetivo de la modificación (prompt)'}[self.lang.get()])
         t = TEXT[self.lang.get()]; self.root.title(t[0]); self.title.config(text=t[0]); self.intro.config(text=t[1]); self.note.config(text=t[19]); self.status_label.config(text=t[13]+':')
         for i, label in enumerate(self.labels): label.config(text=t[i+2])
         for button in self.browsers: button.config(text=t[10])
@@ -73,9 +76,12 @@ class App:
 
     def run(self):
         paths = [field.get().strip() for field in self.fields]
+        objective = self.objective.get('1.0', 'end').strip()
+        if not objective or len(objective) > 4000:
+            messagebox.showerror(TEXT[self.lang.get()][0], {'it':'Inserisci un obiettivo (massimo 4000 caratteri).', 'en':'Enter an objective (maximum 4000 characters).', 'fr':'Saisissez un objectif (4000 caractères maximum).', 'de':'Gib ein Ziel ein (maximal 4000 Zeichen).', 'es':'Introduce un objetivo (máximo 4000 caracteres).'}[self.lang.get()]); return
         if any(not path for path in paths) or any(not Path(path).is_file() for path in paths[:7]) or Path(paths[7]).exists():
             messagebox.showerror(TEXT[self.lang.get()][0], TEXT[self.lang.get()][18]); return
-        cmd = [sys.executable, '-u', str(Path(__file__).with_name('weight_space_experiment.py')), '--original',paths[0],'--teacher',paths[1], '--calibration',paths[2],'--test',paths[3], '--converter',paths[4], '--llama-cli',paths[5], '--quantize',paths[6], '--output',paths[7]]
+        cmd = [sys.executable, '-u', str(Path(__file__).with_name('weight_space_experiment.py')), '--objective',objective,'--original',paths[0],'--teacher',paths[1], '--calibration',paths[2],'--test',paths[3], '--converter',paths[4], '--llama-cli',paths[5], '--quantize',paths[6], '--output',paths[7]]
         try:
             flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
             self.process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', bufsize=1, creationflags=flags)
