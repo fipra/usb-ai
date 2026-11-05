@@ -1,6 +1,8 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Esperimento modifica dei pesi per Windows", "Windows weight-editing experiment", "Expérience de modification des poids pour Windows", "Experiment zur Gewichtsänderung für Windows", "Experimento de edición de pesos para Windows"],
+    ["Prototipo su GitHub: versione Windows non ancora pronta da scaricare.", "Prototype on GitHub: Windows version not yet ready to download.", "Prototype sur GitHub : version Windows pas encore prête à télécharger.", "Prototyp auf GitHub: Windows-Version noch nicht zum Download bereit.", "Prototipo en GitHub: la versión para Windows aún no está lista para descargar."],
     ["Per iniziare · For Dummies", "Getting started · For Dummies", "Pour commencer · For Dummies", "Für den Einstieg · For Dummies", "Para empezar · For Dummies"],
     ["NUOVO", "NEW", "NOUVEAU", "NEU", "NUEVO"],
     ["Scarica LlamaNest Astra per Mac Apple Silicon (sperimentale)", "Download LlamaNest Astra for Mac Apple Silicon (experimental)", "Télécharger LlamaNest Astra pour Mac Apple Silicon (expérimental)", "LlamaNest Astra für Mac Apple Silicon herunterladen (experimentell)", "Descargar LlamaNest Astra para Mac Apple Silicon (experimental)"],
