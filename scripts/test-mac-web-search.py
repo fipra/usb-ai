@@ -1,6 +1,7 @@
 """Test a packaged Mac build and persist web citations with a real local GGUF."""
 import json
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import sys
@@ -35,6 +36,10 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-test-') as temp:
     (root / 'models').mkdir()
     (root / 'models' / model.name).symlink_to(model)
     env = dict(os.environ, USB_AI_DIR=str(root), POCKET_AI_HOME=str(root / 'data'))
+    wrapper = root / 'server-with-log'
+    wrapper.write_text('#!/bin/sh\nexec ' + shlex.quote(str(package / 'bin/llama-server')) + ' "$@" 2>>' + shlex.quote(str(root / 'app-server.log')) + '\n')
+    wrapper.chmod(0o755)
+    env['LLAMA_SERVER'] = str(wrapper)
     server = subprocess.Popen([str(package / 'bin/usb-ai-rust')], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         base = 'http://127.0.0.1:48157'
@@ -56,7 +61,8 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-test-') as temp:
                 with http.open(request, timeout=timeout) as response:
                     return json.load(response)
             except urllib.error.HTTPError as error:
-                raise RuntimeError(f'API error: {error.read().decode()}') from error
+                diagnostic = (root / 'app-server.log').read_text(errors='replace')[-6000:] if (root / 'app-server.log').exists() else ''
+                raise RuntimeError(f'API error: {error.read().decode()}\nServer log: {diagnostic}') from error
         post({'action':'set-inference-options', 'backend':'cpu', 'threads':4})
         post({'action':'set-generation-options', 'contextSize':4096, 'outputLimit':1024, 'temperature':0})
         chat_id = post({'action':'new-chat'})['id']
