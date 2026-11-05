@@ -33,8 +33,11 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-test-') as temp:
             raise RuntimeError('LlamaNest did not start')
         def post(data, timeout=30):
             request = urllib.request.Request(base + '/api', data=json.dumps(data).encode(), headers={'Origin':base, 'Content-Type':'application/json'})
-            with http.open(request, timeout=timeout) as response:
-                return json.load(response)
+            try:
+                with http.open(request, timeout=timeout) as response:
+                    return json.load(response)
+            except urllib.error.HTTPError as error:
+                raise RuntimeError(f'API error: {error.read().decode()}') from error
         post({'action':'set-inference-options', 'backend':'cpu', 'threads':4})
         chat_id = post({'action':'new-chat'})['id']
         source = {'title':'Example source', 'url':'https://example.org/', 'description':'The capital of France is Paris.'}
