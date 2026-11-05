@@ -1,6 +1,7 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Versione corretta: installa accelerate", "Fixed version: installs accelerate", "Version corrigée : installe accelerate", "Korrigierte Version: installiert accelerate", "Versión corregida: instala accelerate"],
     ["Esperimenti", "Experiments", "Expériences", "Experimente", "Experimentos"],
     ["Prototipi per utenti esperti: possono richiedere configurazione e non sono versioni definitive.", "Prototypes for experienced users: they may require setup and are not final releases.", "Prototypes pour utilisateurs expérimentés : ils peuvent nécessiter une configuration et ne sont pas des versions définitives.", "Prototypen für erfahrene Nutzer: Sie können Einrichtung erfordern und sind keine endgültigen Versionen.", "Prototipos para usuarios expertos: pueden requerir configuración y no son versiones definitivas."],
     ["Scarica l’esperimento modifica dei pesi per Windows", "Download the Windows weight-editing experiment", "Télécharger l’expérience de modification des poids pour Windows", "Experiment zur Gewichtsänderung für Windows herunterladen", "Descargar el experimento de edición de pesos para Windows"],
