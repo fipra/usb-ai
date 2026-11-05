@@ -1,6 +1,8 @@
 (() => {
   // The Italian HTML is the readable fallback when JavaScript is unavailable.
   const rows = [
+    ["Scarica l’esperimento modifica dei pesi per Mac Apple Silicon", "Download the weight-editing experiment for Mac Apple Silicon", "Télécharger l’expérience de modification des poids pour Mac Apple Silicon", "Gewichtsexperiment für Mac Apple Silicon herunterladen", "Descargar el experimento de edición de pesos para Mac Apple Silicon"],
+    ["Prototipo: interfaccia e Metal non ancora verificati; richiede Python 3.11 o 3.12 e Internet al primo avvio.", "Prototype: interface and Metal are not yet verified; requires Python 3.11 or 3.12 and Internet on first launch.", "Prototype : interface et Metal non encore vérifiés ; nécessite Python 3.11 ou 3.12 et Internet au premier démarrage.", "Prototyp: Oberfläche und Metal noch nicht überprüft; benötigt Python 3.11 oder 3.12 und Internet beim ersten Start.", "Prototipo: interfaz y Metal aún no verificados; requiere Python 3.11 o 3.12 e Internet al primer inicio."],
     ["Versione con prompt: modifiche predefinite, non esegue funzioni generate", "Prompt version: predefined edits only; generated functions are not executed", "Version avec prompt : modifications prédéfinies, les fonctions générées ne sont pas exécutées", "Version mit Prompt: vordefinierte Änderungen, generierte Funktionen werden nicht ausgeführt", "Versión con prompt: cambios predefinidos, no ejecuta funciones generadas"],
     ["Versione corretta: installa accelerate", "Fixed version: installs accelerate", "Version corrigée : installe accelerate", "Korrigierte Version: installiert accelerate", "Versión corregida: instala accelerate"],
     ["Esperimenti", "Experiments", "Expériences", "Experimente", "Experimentos"],
