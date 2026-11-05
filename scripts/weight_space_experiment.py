@@ -43,6 +43,7 @@ def digest(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--objective', default='', help='Desired behavior for the teacher proposal')
     parser.add_argument('--original', required=True, help='Original small GGUF, never modified')
     parser.add_argument('--teacher', required=True, help='Large GGUF for proposing a plan')
     parser.add_argument('--calibration', required=True, help='JSON questions and accepted answers for proposing edits')
@@ -77,7 +78,7 @@ def main():
         evidence.append({'question':item['question'], 'answer':answer, 'accepted_answers':item['answers']})
     print('Collecting weight statistics and loading the analyst model...', flush=True)
     tensors, summary = tensor_summary(base)
-    plan = propose(summary, evidence, lambda prompt: run_cli(args.llama_cli, teacher, prompt, args.gpu_layers, 1024), tensors)
+    plan = propose(summary, evidence, lambda prompt: run_cli(args.llama_cli, teacher, prompt, args.gpu_layers, 1024), tensors, args.objective)
     (output / 'proposal.json').write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding='utf-8')
     print('Applying the validated proposal to a copy...', flush=True)
     edited = output / 'edited-weights'
@@ -98,7 +99,7 @@ def main():
     print('Comparing models on held-out questions...', flush=True)
     results = compare(tests, lambda which, question: run_cli(args.llama_cli, control if which == 'original' else candidate, question, args.gpu_layers, 64))
     roundtrip = compare(tests, lambda which, question: run_cli(args.llama_cli, original if which == 'original' else control, question, args.gpu_layers, 64))
-    report = {'original_sha256':digest(original), 'control_sha256':digest(control), 'candidate_sha256':digest(candidate),
+    report = {'objective':args.objective, 'original_sha256':digest(original), 'control_sha256':digest(control), 'candidate_sha256':digest(candidate),
               'edit':edit_info, 'control_vs_candidate':results, 'original_vs_control':roundtrip,
               'warning':'Exact-match scoring is limited; review every answer.'}
     (output / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
