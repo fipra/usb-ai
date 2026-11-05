@@ -78,7 +78,9 @@ def main():
         evidence.append({'question':item['question'], 'answer':answer, 'accepted_answers':item['answers']})
     print('Collecting weight statistics and loading the analyst model...', flush=True)
     tensors, summary = tensor_summary(base)
-    plan = propose(summary, evidence, lambda prompt: run_cli(args.llama_cli, teacher, prompt, args.gpu_layers, 1024), tensors, args.objective)
+    def save_response(attempt, response):
+        (output / f'analyst-response-{attempt}.txt').write_text(response, encoding='utf-8')
+    plan = propose(summary, evidence, lambda prompt: run_cli(args.llama_cli, teacher, prompt, args.gpu_layers, 2048), tensors, args.objective, save_response)
     (output / 'proposal.json').write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding='utf-8')
     print('Applying the validated proposal to a copy...', flush=True)
     edited = output / 'edited-weights'
