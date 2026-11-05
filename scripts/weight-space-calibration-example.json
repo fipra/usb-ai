@@ -1,0 +1,5 @@
+[
+  {"question":"Rispondi con una parola: capitale d'Italia?", "answers":["Roma"]},
+  {"question":"Rispondi solo con un numero: quanto fa 3 + 4?", "answers":["7", "sette"]},
+  {"question":"Rispondi con una parola: su quale pianeta viviamo?", "answers":["Terra"]}
+]

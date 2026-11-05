@@ -1,0 +1,5 @@
+[
+  {"question":"Rispondi con una parola: capitale della Francia?", "answers":["Parigi"]},
+  {"question":"Rispondi solo con un numero: quanto fa 2 + 2?", "answers":["4", "quattro"]},
+  {"question":"Rispondi con una parola: quale stella illumina la Terra?", "answers":["Sole", "il Sole"]}
+]
