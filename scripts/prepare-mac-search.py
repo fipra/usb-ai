@@ -24,6 +24,7 @@ def replace(path, old, new):
     path.write_text(data.replace(old, new, 1))
 
 rust = dest / 'src/main.rs'
+replace(rust, '                command\n                    .args(["--host", "127.0.0.1", "--port", &port.to_string(), "-m"])', '                command.args(["--parallel", "1"]);\n                command\n                    .args(["--host", "127.0.0.1", "--port", &port.to_string(), "-m"])')
 replace(rust, '        let sources = if use_docs {', '        let mut sources = if use_docs {')
 replace(rust, '        let direct_notes = if use_docs {', '''        let mut web_sources: Vec<Source> = Vec::new();
         if let Some(items) = data.get("webSources").and_then(Value::as_array) {
