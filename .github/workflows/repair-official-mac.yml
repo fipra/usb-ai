@@ -1,0 +1,41 @@
+name: Repair official Mac Prism package permissions
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/repair-official-mac.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify existing official package
+        run: |
+          curl -fL --retry 3 'https://github.com/fipra/usb-ai/releases/download/prism-lan-mac-math-2026-11-02/LlamaNest-Prism-LAN-mac-arm64.zip' -o "$RUNNER_TEMP/original.zip"
+          echo 'e262eaec56b63599e67ae0a5be6574686e4428b0ebfa6e333d667ca8f6d28335  '"$RUNNER_TEMP/original.zip" | shasum -a 256 -c -
+          ditto -x -k "$RUNNER_TEMP/original.zip" "$RUNNER_TEMP/unpacked"
+      - name: Restore executable permissions and verify signatures
+        run: |
+          P="$RUNNER_TEMP/unpacked/LlamaNest-Prism-LAN-mac-arm64"
+          chmod 755 "$P/Avvia LlamaNest.command" "$P/Avvia LlamaNest LAN.command" "$P/bin/usb-ai-rust" "$P/bin/llama-cli" "$P/bin/llama-server" "$P/bin/llama-quantize" "$P/bin/pdftotext" "$P/bin/prism/llama-server"
+          for f in "$P/bin/usb-ai-rust" "$P/bin/llama-cli" "$P/bin/llama-server" "$P/bin/llama-quantize" "$P/bin/pdftotext" "$P/bin/prism/llama-server"; do codesign --verify --strict "$f"; done
+          "$P/bin/prism/llama-server" --version
+          test -f "$P/bin/prism/libggml-metal.0.dylib"
+          test -z "$(find "$P" -name '*.gguf' -print -quit)"
+          test -z "$(find "$P/PocketAI-data" -type f -print -quit)"
+      - name: Verify local application starts and sees PrismML
+        run: python3 scripts/test-official-mac-launch.py "$RUNNER_TEMP/unpacked/LlamaNest-Prism-LAN-mac-arm64"
+      - name: Create and check corrected ZIP
+        run: |
+          P="$RUNNER_TEMP/unpacked/LlamaNest-Prism-LAN-mac-arm64"
+          ditto -c -k --sequesterRsrc --keepParent "$P" LlamaNest-Prism-Mac-permessi-corretti.zip
+          ditto -x -k LlamaNest-Prism-Mac-permessi-corretti.zip "$RUNNER_TEMP/check"
+          Q="$RUNNER_TEMP/check/LlamaNest-Prism-LAN-mac-arm64"
+          for f in "$Q/Avvia LlamaNest.command" "$Q/bin/llama-server" "$Q/bin/llama-cli" "$Q/bin/llama-quantize" "$Q/bin/pdftotext" "$Q/bin/prism/llama-server"; do test -x "$f"; done
+      - name: Publish corrected official download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "prism-mac-permessi-${GITHUB_SHA}" LlamaNest-Prism-Mac-permessi-corretti.zip --target "$GITHUB_SHA" --title 'LlamaNest Prism Mac: permessi corretti' --notes 'Pacchetto ufficiale esistente con permessi di esecuzione ripristinati. Modelli e chat non inclusi.'
