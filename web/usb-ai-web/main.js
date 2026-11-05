@@ -1,3 +1,4 @@
+import { normalizeThinking, visibleAnswer } from './thinking.js';
 import './style.css';
 import katex from 'katex';
 window.katex = katex;
@@ -63,11 +64,11 @@ function closeSidebar() { $('sidebar').classList.remove('open'); }
 function saveSettings() { return db.put('settings', { id: 'main', language, selectedId, activeId, thinking, remoteConfig, contextSize, outputLimit, temperature, cpuThreads, windowsBackend, semanticEnabled }); }
 function renderChats() { const list = $('chat-list'); list.replaceChildren(); $('clear-chats').disabled = busy || !chats.length; if (!chats.length) list.append(node('p', tr('noChats'), 'empty')); for (const chat of [...chats].sort((a,b) => b.updated - a.updated)) { const row=node('div',undefined,'history-row'),button=node('button',chat.title,`chat-item${chat.id === activeId ? ' active' : ''}`),rename=node('button','✎','history-action'),remove=node('button','×','history-action'); button.onclick=()=>{activeId=chat.id;saveSettings();render();closeSidebar()}; for(const [control,key] of [[rename,'renameChat'],[remove,'deleteChat']]){control.type='button';control.title=tr(key);control.setAttribute('aria-label',tr(key)+': '+chat.title);control.disabled=busy} rename.onclick=()=>run(async()=>{if(busy)return;const value=prompt(tr('renamePrompt'),chat.title);if(value===null)return;const title=value.trim();if(!title||[...title].length>100||/[\x00-\x1f\x7f]/.test(title)){setStatus(tr('invalidTitle'),true);return}chat.title=title;chat.titleCustom=true;await db.put('chats',chat);render()});remove.onclick=()=>run(()=>deleteChats([chat.id],tr('deleteConfirm')));row.append(button,rename,remove);list.append(row)} }
 async function deleteChats(ids,confirmation){if(busy||!ids.length||!confirm(confirmation))return;await db.removeChats(ids);const selected=new Set(ids);documents=documents.filter(doc=>!selected.has(doc.chatId));chats=chats.filter(chat=>!selected.has(chat.id));if(selected.has(activeId))activeId=chats[0]?.id;await saveSettings();render()}
-function renderMessages() { const box = $('messages'); box.replaceChildren(); const chat = chats.find(item => item.id === activeId); $('chat-actions').hidden = !chat?.messages.length; if (!chat?.messages.length) { const welcome = node('div', undefined, 'welcome'); welcome.append(node('div', '✦', 'welcome-mark'), node('h1', tr('welcome')), node('p', iosDiagnosticsEnabled() && !selectedId ? tr('iosStarterHint') : models.length ? tr('welcomeNote') : tr(usesSafariCpu() ? 'safariStarterHint' : 'starterHint'))); box.append(welcome); return; } for (const [messageIndex, message] of chat.messages.entries()) { const row = node('article', undefined, `message ${message.role}`); row.append(node('div', message.role === 'user' ? 'U' : '✦', 'avatar')); const content = node('div'); const body = node('div', undefined, 'message-body'); if (message.role === 'assistant') window.USB_AI_RESPONSE_VIEW.render(body, message, language, thinking); else window.USB_AI_CODE_VIEW.render(body, message.text, language); content.append(node('strong', message.role === 'user' ? tr('you') : tr('assistant')), body); if (message.role === 'user') window.USB_AI_CODE_VIEW.addEditButton(content, message, language, value => run(() => send(value, messageIndex, chat.id)), busy); if (message.role === 'assistant' && message.text) { const correction = node('button', tr('rememberCorrection'), 'memory-correction'); correction.onclick = () => { pendingMemoryPrompt = null; $('memory-id').value = ''; $('memory-text').value = correctionPrefillEnabled ? window.USB_AI_RESPONSE_VIEW.correctionText(chat.messages, messageIndex, language) : ''; $('memory-dialog').showModal(); $('memory-text').focus(); }; content.append(correction); } if (message.sources?.length) { const details = node('details', undefined, 'source'); details.append(node('summary', `${tr('sources')} (${message.sources.length})`)); for (const source of message.sources) details.append(node('p', `${source.name}: ${source.text}`)); content.append(details); } if (message.text) content.append(messageActions(chat, message)); row.append(content); box.append(row); } $('thread').scrollTop = $('thread').scrollHeight; }
+function renderMessages() { const box = $('messages'); box.replaceChildren(); const chat = chats.find(item => item.id === activeId); $('chat-actions').hidden = !chat?.messages.length; if (!chat?.messages.length) { const welcome = node('div', undefined, 'welcome'); welcome.append(node('div', '✦', 'welcome-mark'), node('h1', tr('welcome')), node('p', iosDiagnosticsEnabled() && !selectedId ? tr('iosStarterHint') : models.length ? tr('welcomeNote') : tr(usesSafariCpu() ? 'safariStarterHint' : 'starterHint'))); box.append(welcome); return; } for (const [messageIndex, message] of chat.messages.entries()) { const row = node('article', undefined, `message ${message.role}`); row.append(node('div', message.role === 'user' ? 'U' : '✦', 'avatar')); const content = node('div'); const body = node('div', undefined, 'message-body'); if (message.role === 'assistant') window.USB_AI_RESPONSE_VIEW.render(body, { ...message, text: normalizeThinking(message.text) }, language, thinking); else window.USB_AI_CODE_VIEW.render(body, message.text, language); content.append(node('strong', message.role === 'user' ? tr('you') : tr('assistant')), body); if (message.role === 'user') window.USB_AI_CODE_VIEW.addEditButton(content, message, language, value => run(() => send(value, messageIndex, chat.id)), busy); if (message.role === 'assistant' && message.text) { const correction = node('button', tr('rememberCorrection'), 'memory-correction'); correction.onclick = () => { pendingMemoryPrompt = null; $('memory-id').value = ''; $('memory-text').value = correctionPrefillEnabled ? window.USB_AI_RESPONSE_VIEW.correctionText(chat.messages.map(item => item.role === 'assistant' ? { ...item, text: normalizeThinking(item.text) } : item), messageIndex, language) : ''; $('memory-dialog').showModal(); $('memory-text').focus(); }; content.append(correction); } if (message.sources?.length) { const details = node('details', undefined, 'source'); details.append(node('summary', `${tr('sources')} (${message.sources.length})`)); for (const source of message.sources) details.append(node('p', `${source.name}: ${source.text}`)); content.append(details); } if (message.text) content.append(messageActions(chat, message)); row.append(content); box.append(row); } $('thread').scrollTop = $('thread').scrollHeight; }
 function messageActions(chat, message) {
   const actions = node('div', undefined, 'message-actions');
   for (const [label, path, action] of [
-    ['copyMessage', 'M8 4h10a2 2 0 0 1 2 2v11h-2V6H8z M5 8h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z', async () => { try { await navigator.clipboard.writeText(message.text); setStatus(tr('messageCopied')); } catch { setStatus(tr('chatCopyError'), true); } }],
+    ['copyMessage', 'M8 4h10a2 2 0 0 1 2 2v11h-2V6H8z M5 8h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z', async () => { try { await navigator.clipboard.writeText(message.role === 'assistant' ? visibleAnswer(message.text) : message.text); setStatus(tr('messageCopied')); } catch { setStatus(tr('chatCopyError'), true); } }],
     ['shareMessage', 'M12 15V3 M8 7l4-4 4 4 M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6', () => openChatShare({title:chat.title, messages:[message]})]
   ]) {
     const button = node('button', undefined, 'message-action'); button.type = 'button'; button.title = tr(label); button.setAttribute('aria-label', tr(label));
@@ -286,7 +287,9 @@ async function send(editedText, editIndex, editChatId) {
   controller = new AbortController();
   setBusy(true); setStatus(tr('generating'), false, true); renderMessages();
   const body = $('messages').lastElementChild?.querySelector('.message-body');
-  const streamView = body && window.USB_AI_RESPONSE_VIEW.streamRenderer(body, answer, language, thinking, $('thread'));
+  const showGenerationThinking = thinking;
+  let pendingAnswer = '';
+  const streamView = body && window.USB_AI_RESPONSE_VIEW.streamRenderer(body, answer, language, showGenerationThinking, $('thread'));
   try {
     if (!isRemote(selectedId)) {
       setStatus(tr('loading'), false, true);
@@ -294,14 +297,20 @@ async function send(editedText, editIndex, editChatId) {
       setStatus(tr('generating'), false, true);
     }
     answer.usage = await completeWithRetry(contexts, (messages, onToken, signal) => isRemote(selectedId) ? remoteChat(remoteConfig, selectedId.slice(7), messages, onToken, signal, temperature) : streamChat(messages, onToken, signal, thinking, outputLimit, temperature), token => {
-      answer.text += token;
-      streamView?.update();
+      pendingAnswer += token;
+      // A template can supply the opening tag, so keep the response hidden
+      // until completion when reasoning is disabled.
+      if (showGenerationThinking) { answer.text = pendingAnswer; streamView?.update(); }
     }, controller.signal, () => {
+      pendingAnswer = '';
       answer.text = '';
       setStatus(tr('retryingAnswer'));
     });
+    if (!showGenerationThinking && controller.signal.aborted) answer.text = '';
+    else answer.text = normalizeThinking(pendingAnswer);
     setStatus(controller.signal.aborted ? tr('stopped') : tr('ready'));
   } catch (error) {
+    if (!showGenerationThinking) answer.text = '';
     if (!controller.signal.aborted) {
       const message = error.message === 'GPU_OUT_OF_MEMORY' ? `${tr('error')}: ${tr('gpuOutOfMemory')}` : error.message === 'EMPTY_MODEL_RESPONSE' ? tr('emptyResponse') : error.message === 'GENERATION_TIMEOUT' ? tr('safariGenerationTimeout') : error.message === 'CREATOR_PROMPT_TOO_LONG' ? tr('creatorPromptTooLong') : `${tr('error')}: ${error.message}`;
       if (editing && !answer.text) { chat.messages = previousMessages; chat.title = previousTitle; }
@@ -443,7 +452,7 @@ let shareData, shareLink;
 $('share-chat').onclick = () => openChatShare(chats.find(item => item.id === activeId));
 async function openChatShare(chat) {
   if (!chat?.messages.length) { setStatus(tr('chatCopyEmpty')); return; }
-  try { shareData = sharedChat(chat); }
+  try { shareData = sharedChat({ ...chat, messages: chat.messages.map(message => message.role === 'assistant' ? { ...message, text: visibleAnswer(message.text) } : message) }); }
   catch { setStatus(tr('shareTooLarge'), true); return; }
   shareLink = null; $('share-link').value = ''; $('share-link').hidden = true;
   $('share-copy').hidden = true; $('share-whatsapp').hidden = true;
@@ -475,7 +484,7 @@ $('import-chat-file').onchange = async event => {
 $('copy-chat').onclick = async () => {
   const chat = chats.find(item => item.id === activeId);
   if (!chat?.messages.length) { setStatus(tr('chatCopyEmpty')); return; }
-  const content = chat.messages.map(item => `${item.role === 'user' ? tr('you') : tr('assistant')}:\n${item.text}`).join('\n\n');
+  const content = chat.messages.map(item => `${item.role === 'user' ? tr('you') : tr('assistant')}:\n${item.role === 'assistant' ? visibleAnswer(item.text) : item.text}`).join('\n\n');
   try { await navigator.clipboard.writeText(content); setStatus(tr('chatCopied')); }
   catch { setStatus(tr('chatCopyError'), true); }
 };
@@ -561,7 +570,7 @@ $('doc-file').onchange = uploadFiles;
 $('chat-files').onchange = uploadFiles;
 $('delete-chat').onclick = () => run(() => deleteChats(activeId ? [activeId] : [],tr('deleteConfirm')));
 $('clear-chats').onclick = () => run(() => deleteChats(chats.map(chat=>chat.id),tr('clearChatsConfirm')));
-$('export-chat').onclick = () => { const chat = chats.find(item => item.id === activeId); if (!chat) return; const content = chat.messages.map(item => `## ${item.role === 'user' ? tr('you') : tr('assistant')}\n\n${item.text}`).join('\n\n'); const url = URL.createObjectURL(new Blob([content], {type:'text/markdown'})); const link = node('a'); link.href = url; link.download = 'usb-ai-chat.md'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+$('export-chat').onclick = () => { const chat = chats.find(item => item.id === activeId); if (!chat) return; const content = chat.messages.map(item => `## ${item.role === 'user' ? tr('you') : tr('assistant')}\n\n${item.role === 'assistant' ? visibleAnswer(item.text) : item.text}`).join('\n\n'); const url = URL.createObjectURL(new Blob([content], {type:'text/markdown'})); const link = node('a'); link.href = url; link.download = 'usb-ai-chat.md'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
 window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installing = event; });
 $('install').onclick = async () => { if (installing) { installing.prompt(); await installing.userChoice; installing = undefined; $('install').hidden = true; } else setStatus(tr('installUnavailable')); };
 window.addEventListener('online', render); window.addEventListener('offline', render);

@@ -1,3 +1,4 @@
+import { visibleAnswer } from './thinking.js';
 export function documentsForChat(documents, chatId) {
   return chatId ? documents.filter(document => document.chatId === chatId) : [];
 }
@@ -61,7 +62,7 @@ export function recentContext(messages, question, maxHistoryChars = 2400) {
   const history = [];
   for (const message of [...messages].reverse()) {
     if (remaining <= 0) break;
-    const clean = message.role === 'assistant' ? message.text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim() : message.text;
+    const clean = message.role === 'assistant' ? visibleAnswer(message.text) : message.text;
     const content = clean.slice(-remaining);
     history.push({role:message.role,content});
     remaining -= content.length;

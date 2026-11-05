@@ -1,3 +1,4 @@
+import { visibleAnswer } from './thinking.js';
 import { documentQuestion, recentContext } from './retrieval.js';
 
 const FORMAT_GUIDE = { role:'system', content:'You are LlamaNest, an AI assistant. Reply in the language of the user’s latest message unless they request another language. Answer directly and match the length to the request. Reply to a greeting with a greeting, not an explanation. For example, for Italian “ciao”, say “Ciao! Come posso aiutarti?”; for “chi sei”, say “Sono LlamaNest, un assistente AI.” Answer simple questions briefly. Avoid unsolicited sections, examples, background, and self-description. Give detail when requested or needed. Be clear and honest; do not invent facts. Use Markdown only when useful, and fenced blocks for code.' };
@@ -28,7 +29,7 @@ export async function completeWithRetry(contexts, stream, onToken, signal, onRet
         visible += token;
         onToken(token);
       }, signal);
-      if (visible.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim()) return usage;
+      if (visibleAnswer(visible)) return usage;
     } catch (error) {
       if (signal.aborted) return;
       lastError = error;
