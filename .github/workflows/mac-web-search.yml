@@ -1,13 +1,5 @@
 name: Mac web search experiment
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/mac-web-search.yml'
-      - 'scripts/prepare-mac-search.py'
-      - 'scripts/mac-web-search-ui.js'
-      - 'scripts/build-mac-web-search.sh'
-      - 'scripts/test-mac-web-search.py'
   workflow_dispatch:
 permissions:
   contents: write
