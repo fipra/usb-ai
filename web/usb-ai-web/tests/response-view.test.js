@@ -51,3 +51,7 @@ test('a correction includes the question that preceded this answer', () => {
   assert.equal(window.USB_AI_RESPONSE_VIEW.correctionText(messages, 3, 'en'), 'Question: E quella del Canada?\n\nCorrected answer: Ottawa');
   assert.equal(window.USB_AI_RESPONSE_VIEW.correctionText([{role:'assistant', text:'Hello'}], 0, 'en'), 'Hello');
 });
+
+test('hides an implicit opening tag in saved desktop and web messages', () => {
+  assert.deepEqual(window.USB_AI_RESPONSE_VIEW.splitThinking('private</think>answer'), { answer:'answer', thinking:'private' });
+});

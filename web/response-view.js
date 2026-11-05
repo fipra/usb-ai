@@ -8,7 +8,10 @@
     es: ['Razonamiento', 'Entrada', 'Salida', 'tokens/s']
   };
   function splitThinking(text) {
-    const parts = String(text || '').split(/(<\/?think>)/gi);
+    let value = String(text || '');
+    const first = /<\/?think>/i.exec(value);
+    if (first && /^<\/think>$/i.test(first[0])) value = '<think>' + value;
+    const parts = value.split(/(<\/?think>)/gi);
     let inside = false, answer = '', thinking = '';
     for (const part of parts) {
       if (/^<think>$/i.test(part)) inside = true;

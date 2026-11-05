@@ -864,10 +864,16 @@ fn read_completion_stream(
 fn final_answer_only(text: &str) -> String {
     let mut answer = String::new();
     let mut remaining = text;
-    while let Some(start) = remaining.find("<think>") {
+    let lowercase = remaining.to_ascii_lowercase();
+    if let Some(end) = lowercase.find("</think>") {
+        if lowercase.find("<think>").is_none_or(|start| end < start) {
+            remaining = &remaining[end + "</think>".len()..];
+        }
+    }
+    while let Some(start) = remaining.to_ascii_lowercase().find("<think>") {
         answer.push_str(&remaining[..start]);
         remaining = &remaining[start + "<think>".len()..];
-        let Some(end) = remaining.find("</think>") else {
+        let Some(end) = remaining.to_ascii_lowercase().find("</think>") else {
             return answer.trim().to_owned();
         };
         remaining = &remaining[end + "</think>".len()..];
@@ -2457,7 +2463,14 @@ impl App {
             answer.push_str("<think>");
             update("<think>")?;
         }
-        let stream_result = read_completion_stream(BufReader::new(stdout), &mut answer, update);
+        let thinking_enabled = self.db.thinking;
+        let stream_result = if thinking_enabled {
+            read_completion_stream(BufReader::new(stdout), &mut answer, update)
+        } else {
+            // Buffer until completion: some templates supply the opening tag
+            // themselves, so early text cannot yet be identified as reasoning.
+            read_completion_stream(BufReader::new(stdout), &mut answer, &mut |_| Ok(()))
+        };
         let mut child = generation.curl.lock().unwrap().take().unwrap();
         if stream_result.is_err() || generation.cancelled.load(Ordering::SeqCst) {
             let _ = child.kill();
@@ -2466,7 +2479,14 @@ impl App {
             .wait_with_output()
             .map_err(|e| format!("llama-server: {e}"))?;
         if generation.cancelled.load(Ordering::SeqCst) {
-            return Ok((answer.trim().to_owned(), None));
+            return Ok((
+                if thinking_enabled {
+                    answer.trim().to_owned()
+                } else {
+                    String::new()
+                },
+                None,
+            ));
         }
         let usage = stream_result?;
         if !output.status.success() {
@@ -2475,6 +2495,12 @@ impl App {
                 "llama-server: {}",
                 String::from_utf8_lossy(&output.stderr).trim()
             ));
+        }
+        if !thinking_enabled {
+            answer = final_answer_only(&answer);
+            if !answer.is_empty() {
+                update(&answer)?;
+            }
         }
         if answer.trim().is_empty() {
             return Err(localized_empty_response(self.language()).into());
@@ -3535,6 +3561,14 @@ mod tests {
             &mut |_| Ok(())
         )
         .is_err());
+    }
+    #[test]
+    fn hides_reasoning_with_or_without_opening_tag() {
+        assert_eq!(final_answer_only("private</think>answer"), "answer");
+        assert_eq!(final_answer_only("<think>private</think>answer"), "answer");
+        assert_eq!(final_answer_only("<think>unfinished"), "");
+        assert_eq!(final_answer_only("plain answer"), "plain answer");
+        assert_eq!(final_answer_only("secret</THINK>answer"), "answer");
     }
     #[test]
     fn completion_stream_reads_real_token_counts_and_speed() {
