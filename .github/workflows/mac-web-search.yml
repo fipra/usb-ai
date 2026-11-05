@@ -1,0 +1,36 @@
+name: Mac web search experiment
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/mac-web-search.yml'
+      - 'scripts/prepare-mac-search.py'
+      - 'scripts/mac-web-search-ui.js'
+      - 'scripts/build-mac-web-search.sh'
+      - 'scripts/test-mac-web-search.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install local inference and PDF tools
+        run: brew install llama.cpp poppler
+      - name: Build and test portable package
+        run: bash scripts/build-mac-web-search.sh
+      - name: Download verified small model for the smoke test
+        run: |
+          curl -fL --retry 3 --connect-timeout 30 'https://huggingface.co/QuantFactory/SmolLM2-135M-Instruct-GGUF/resolve/476854d00ede130660aba430d15f9347ad2e7d0e/SmolLM2-135M-Instruct.Q4_K_M.gguf' -o "$RUNNER_TEMP/smoke.gguf"
+          echo '8030f04528538d47bda434f6f0bdf3952c40a58123e4d5e755332f23731a8684  '"$RUNNER_TEMP/smoke.gguf" | shasum -a 256 -c -
+      - name: Exercise packaged local inference with web sources
+        run: python3 scripts/test-mac-web-search.py release/LlamaNest-Ricerca-Web-Mac-Apple-Silicon "$RUNNER_TEMP/smoke.gguf"
+      - name: Create portable ZIP
+        run: ditto -c -k --sequesterRsrc --keepParent release/LlamaNest-Ricerca-Web-Mac-Apple-Silicon LlamaNest-Ricerca-Web-Mac-Apple-Silicon.zip
+      - name: Publish experimental download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "mac-ricerca-web-${GITHUB_SHA}" LlamaNest-Ricerca-Web-Mac-Apple-Silicon.zip --target "$GITHUB_SHA" --title 'LlamaNest Mac ricerca web sperimentale' --notes 'Versione separata per Apple Silicon. Ricerca facoltativa con Purili; la domanda viene inviata online. GGUF non incluso.' --prerelease
