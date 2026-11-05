@@ -46,7 +46,7 @@ def extract_json(text):
     return match.group(1) if match else text
 
 
-def propose(summary, evidence, generate, tensors, objective=""):
+def propose(summary, evidence, generate, tensors, objective="", response_sink=None):
     if not isinstance(objective, str) or len(objective) > 4000:
         raise ValueError("Objective must be at most 4000 characters")
     prompt = (
@@ -61,7 +61,17 @@ def propose(summary, evidence, generate, tensors, objective=""):
         '\nTensor statistics: ' + json.dumps(summary, ensure_ascii=False) +
         '\nObserved errors: ' + json.dumps(evidence, ensure_ascii=False)
     )
-    return parse_model_plan(extract_json(generate(prompt)), tensors)
+    for attempt in range(2):
+        response = generate(prompt)
+        if response_sink:
+            response_sink(attempt + 1, response)
+        try:
+            return parse_model_plan(extract_json(response), tensors)
+        except ValueError as exc:
+            if attempt:
+                raise ValueError('The analyst did not return a valid JSON plan. See analyst-response-1.txt and analyst-response-2.txt in the results folder.') from exc
+            prompt += ('\nYour previous response was invalid. Return only a valid JSON object '
+                       'matching the specified format, with no explanation or thinking text.')
 
 
 def main():
