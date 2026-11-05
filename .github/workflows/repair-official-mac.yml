@@ -38,4 +38,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release create "prism-mac-permessi-${GITHUB_SHA}" LlamaNest-Prism-Mac-permessi-corretti.zip --target "$GITHUB_SHA" --title 'LlamaNest Prism Mac: permessi corretti' --notes 'Pacchetto ufficiale esistente con permessi di esecuzione ripristinati. Modelli e chat non inclusi.'
+        run: |
+          gh release create "prism-mac-permessi-${GITHUB_SHA}" LlamaNest-Prism-Mac-permessi-corretti.zip --target "$GITHUB_SHA" --title 'LlamaNest Prism Mac: permessi corretti' --notes 'Pacchetto ufficiale esistente con permessi di esecuzione ripristinati. Modelli e chat non inclusi.'
