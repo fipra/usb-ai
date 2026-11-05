@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
     (work / 'node_modules').symlink_to(web / 'node_modules', target_is_directory=True)
     app = work / 'usb-ai-web'
     main = app / 'main.js'
-    replace(main, "import './style.css';", "import './style.css';\nimport { prepareWebResults, webSearchQuestion, searchWeb } from './web-search.js';")
+    replace(main, "import './style.css';", "import './style.css';\nimport { prepareWebResults, webSearchQuestion, webSearchQuery, searchWeb } from './web-search.js';")
     replace(main, 'let thinking = false, semanticEnabled = false;', 'let thinking = false, semanticEnabled = false;\nlet webSearchEnabled = false;')
     replace(main, "$('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');", "renderWebSearch(); $('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');")
     replace(main, "  $('semantic-toggle').disabled = value;", "  $('semantic-toggle').disabled = value;\n  $('web-search-toggle').disabled = value;")
@@ -30,7 +30,9 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
       if (text.length > 600 || text.trim().split(/\\s+/).length > 75) throw Error(tr('webSearchLong'));
       setStatus(tr('webSearchSearching'), false, true);
       let entries;
-      try { entries = await searchWeb(text, controller.signal); }
+      const earlierMessages = editing ? previousMessages.slice(0, editIndex) : chat.messages.slice(0, -2);
+      const searchQuery = webSearchQuery(text, earlierMessages);
+      try { entries = await searchWeb(searchQuery, controller.signal); }
       catch (error) { if (controller.signal.aborted) throw error; throw Error(error.message === 'WEB_SEARCH_LIMIT' ? tr('webSearchLimit') : tr('webSearchError')); }
       if (!entries.length) throw Error(tr('webSearchEmpty'));
       answer.webSources = entries;

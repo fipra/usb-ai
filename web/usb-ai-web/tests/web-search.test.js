@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepareWebResults, webSearchQuestion, searchWeb } from '../web-search.js';
+import { prepareWebResults, webSearchQuestion, webSearchQuery, searchWeb } from '../web-search.js';
+
+test('follow-up searches keep the topic while new subjects stay independent', () => {
+  const history = [{role:'user', text:'la teoria della relativita'}, {role:'assistant', text:'Einstein'}];
+  assert.equal(webSearchQuery('scrivi le formule', history), 'la teoria della relativita scrivi le formule');
+  assert.equal(webSearchQuery('chi è Giorgia Meloni?', history), 'chi è Giorgia Meloni?');
+  assert.equal(webSearchQuery('spiega la fotosintesi', history), 'spiega la fotosintesi');
+  assert.equal(webSearchQuery('scrivi le formule', []), 'scrivi le formule');
+  assert.equal(webSearchQuery('spiega questa', [...history,{role:'user',text:'scrivi le formule'}]), 'la teoria della relativita spiega questa');
+});
 
 test('web results reject unsafe links, are bounded and are treated as untrusted', () => {
   const results = prepareWebResults([
@@ -14,6 +23,7 @@ test('web results reject unsafe links, are bounded and are treated as untrusted'
   assert.equal(results[1].description.length, 450);
   const question = webSearchQuestion('What happened?', results);
   assert.match(question, /untrusted source material/);
+  assert.match(question, /conversation, your knowledge and the web excerpts/);
   assert.match(question, /\[1\] One/);
   assert.match(question, /User question: What happened\?/);
 });
