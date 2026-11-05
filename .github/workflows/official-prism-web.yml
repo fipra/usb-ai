@@ -1,0 +1,47 @@
+name: Official Prism Mac web experiment
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/official-prism-web.yml'
+      - 'scripts/build-official-prism-web.sh'
+      - 'scripts/test-official-prism-web.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch source revision used for the official Mac version
+        run: git fetch --no-tags --depth 1 origin 7bcd90bf98478a3c83432b57fe3137dc7c496f5c
+      - name: Build from official Prism Mac package and source
+        run: bash scripts/build-official-prism-web.sh
+      - name: Download and verify a small test model
+        run: |
+          curl -fL --retry 3 --connect-timeout 30 'https://huggingface.co/QuantFactory/SmolLM2-135M-Instruct-GGUF/resolve/476854d00ede130660aba430d15f9347ad2e7d0e/SmolLM2-135M-Instruct.Q4_K_M.gguf' -o "$RUNNER_TEMP/smoke.gguf"
+          echo '8030f04528538d47bda434f6f0bdf3952c40a58123e4d5e755332f23731a8684  '"$RUNNER_TEMP/smoke.gguf" | shasum -a 256 -c -
+      - name: Build matching PrismML for CPU-only test
+        run: |
+          git init "$RUNNER_TEMP/prism-src"
+          git -C "$RUNNER_TEMP/prism-src" remote add origin https://github.com/PrismML-Eng/llama.cpp.git
+          git -C "$RUNNER_TEMP/prism-src" fetch --depth 1 origin 5628c7338963b00a598f2a588fd09a79af6d70db
+          git -C "$RUNNER_TEMP/prism-src" checkout --detach FETCH_HEAD
+          cmake -S "$RUNNER_TEMP/prism-src" -B "$RUNNER_TEMP/prism-src/build" -DCMAKE_BUILD_TYPE=Release -DGGML_METAL=OFF -DGGML_BLAS=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=OFF -DLLAMA_BUILD_SERVER=ON
+          cmake --build "$RUNNER_TEMP/prism-src/build" --target llama-server -j 3
+      - name: Test Prism inference and web sources
+        run: python3 scripts/test-official-prism-web.py release/LlamaNest-Prism-Ricerca-Web-Mac-Apple-Silicon "$RUNNER_TEMP/smoke.gguf" "$RUNNER_TEMP/prism-src/build/bin/llama-server"
+      - name: Create experimental ZIP
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent release/LlamaNest-Prism-Ricerca-Web-Mac-Apple-Silicon LlamaNest-Prism-Ricerca-Web-Mac-Apple-Silicon.zip
+          ditto -x -k LlamaNest-Prism-Ricerca-Web-Mac-Apple-Silicon.zip "$RUNNER_TEMP/check"
+          test -x "$RUNNER_TEMP/check/LlamaNest-Prism-Ricerca-Web-Mac-Apple-Silicon/Avvia LlamaNest.command"
+          test -x "$RUNNER_TEMP/check/LlamaNest-Prism-Ricerca-Web-Mac-Apple-Silicon/bin/prism/llama-server"
+      - name: Publish experimental download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "prism-ufficiale-web-${GITHUB_SHA}" LlamaNest-Prism-Ricerca-Web-Mac-Apple-Silicon.zip --target "$GITHUB_SHA" --title 'LlamaNest Prism ufficiale con ricerca web' --notes 'Variante sperimentale basata sul pacchetto ufficiale Mac PrismML. Modelli e chat non inclusi. Prova di inferenza CPU con PrismML; Metal non verificato in CI.' --prerelease

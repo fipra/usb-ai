@@ -2,9 +2,11 @@
 """Make an isolated source tree for the experimental macOS web-search build."""
 import shutil
 import sys
+import os
 from pathlib import Path
 
-root = Path(__file__).resolve().parents[1]
+helpers = Path(__file__).resolve().parents[1]
+root = Path(os.environ.get('LLAMANEST_SOURCE_BASE', helpers)).resolve()
 dest = Path(sys.argv[1]).resolve()
 if dest.exists():
     raise SystemExit('Destination must not exist')
@@ -24,7 +26,6 @@ def replace(path, old, new):
     path.write_text(data.replace(old, new, 1))
 
 rust = dest / 'src/main.rs'
-replace(rust, '                command\n                    .args(["--host", "127.0.0.1", "--port", &port.to_string(), "-m"])', '                command.args(["--parallel", "1"]);\n                command\n                    .args(["--host", "127.0.0.1", "--port", &port.to_string(), "-m"])')
 replace(rust, '        let sources = if use_docs {', '        let mut sources = if use_docs {')
 replace(rust, '        let direct_notes = if use_docs {', '''        let mut web_sources: Vec<Source> = Vec::new();
         if let Some(items) = data.get("webSources").and_then(Value::as_array) {
@@ -55,10 +56,10 @@ replace(html, "connect-src 'self';", "connect-src 'self' https://puri.li;")
 replace(html, '<button class="tool-chip" id="thinking-toggle"', '<button class="tool-chip" id="web-search-toggle" type="button" aria-pressed="false"></button><button class="tool-chip" id="thinking-toggle"')
 replace(html, '  <script src="/i18n.js"></script>', '''  <dialog class="documents-dialog" id="web-search-dialog"><div class="dialog-head"><h2 data-i18n="webSearchTitle"></h2><button class="close" id="web-search-close" type="button">×</button></div><div class="dialog-body"><p data-i18n="webSearchPrivacy"></p><p data-i18n="webSearchFree"></p><p><a href="https://puri.li/terms" target="_blank" rel="noopener noreferrer" data-i18n="webSearchTerms"></a></p><button class="model-action primary" type="button" id="web-search-enable" data-i18n="webSearchActivate"></button></div></dialog>
   <script src="/i18n.js"></script>''')
-js = (root / 'web/usb-ai-web/web-search.js').read_text().replace('export function ', 'function ').replace('export async function ', 'async function ')
-strings = (root / 'scripts/web-search-strings.js').read_text()
+js = (helpers / 'web/usb-ai-web/web-search.js').read_text().replace('export function ', 'function ').replace('export async function ', 'async function ')
+strings = (helpers / 'scripts/web-search-strings.js').read_text()
 strings = strings.replace('translations[lang]', 'window.USB_AI_I18N[lang]').replace('translations.en', 'window.USB_AI_I18N.en').replace('translations.it', 'window.USB_AI_I18N.it').replace('translations.fr', 'window.USB_AI_I18N.fr').replace('translations.de', 'window.USB_AI_I18N.de').replace('translations.es', 'window.USB_AI_I18N.es')
-ui = (root / 'scripts/mac-web-search-ui.js').read_text()
+ui = (helpers / 'scripts/mac-web-search-ui.js').read_text()
 replace(html, '    function newRequestId(){', js + '\n' + strings + '\n' + ui + '\n    function newRequestId(){')
 replace(html, "function render(){if(!state)return;translateStatic();", "function render(){if(!state)return;translateStatic();renderWebSearch();")
 replace(html, "const chatId=active,requestId=activeRequestId,chat=state.chats.find(item=>item.id===chatId);", "const chatId=active,requestId=activeRequestId,chat=state.chats.find(item=>item.id===chatId);const webHistory=edit?chat.messages.slice(0,edit.index):chat.messages.slice();")
