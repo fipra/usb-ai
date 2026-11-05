@@ -30,7 +30,10 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
       if (text.length > 600 || text.trim().split(/\\s+/).length > 75) throw Error(tr('webSearchLong'));
       setStatus(tr('webSearchSearching'), false, true);
       const response = await fetch('/api/web-search', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query:text, key:webSearchKey, language}), signal:controller.signal});
-      if (!response.ok) throw Error(response.status === 401 ? tr('webSearchKeyError') : tr('webSearchError'));
+      if (!response.ok) {
+        if (response.status === 401) { webSearchKey = ''; webSearchEnabled = false; }
+        throw Error(response.status === 401 ? tr('webSearchKeyError') : response.status === 429 ? tr('webSearchLimit') : tr('webSearchError'));
+      }
       const result = await response.json();
       const entries = prepareWebResults(result.results);
       if (!entries.length) throw Error(tr('webSearchEmpty'));
@@ -56,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
     replace(app / 'public' / 'sw.js', 'usb-ai-web-shell-', 'usb-ai-search-experiment-shell-')
     html = app / 'index.html'
     replace(html, '<button type="button" id="thinking-toggle"', '<button type="button" id="web-search-toggle" class="tool-chip" aria-pressed="false"></button><button type="button" id="thinking-toggle"')
-    replace(html, '</body>', '''<dialog id="web-search-dialog"><header class="dialog-head"><h2 data-i18n="webSearchTitle"></h2><button type="button" class="close" id="web-search-close" aria-label="Close">×</button></header><div class="dialog-body"><p data-i18n="webSearchPrivacy"></p><p><a href="https://api-dashboard.search.brave.com/" target="_blank" rel="noopener noreferrer" data-i18n="webSearchGetKey"></a></p><label><span data-i18n="webSearchKey"></span> <input type="password" id="web-search-key" autocomplete="off" maxlength="200"></label><p class="hint" data-i18n="webSearchKeyNote"></p><button type="button" id="web-search-enable" class="action" data-i18n="webSearchActivate"></button></div></dialog></body>''')
+    replace(html, '</body>', '''<dialog id="web-search-dialog"><header class="dialog-head"><h2 data-i18n="webSearchTitle"></h2><button type="button" class="close" id="web-search-close" aria-label="Close">×</button></header><div class="dialog-body"><p data-i18n="webSearchPrivacy"></p><p><a href="https://app.tavily.com/" target="_blank" rel="noopener noreferrer" data-i18n="webSearchGetKey"></a></p><label><span data-i18n="webSearchKey"></span> <input type="password" id="web-search-key" autocomplete="off" maxlength="200"></label><p class="hint" data-i18n="webSearchKeyNote"></p><button type="button" id="web-search-enable" class="action" data-i18n="webSearchActivate"></button></div></dialog></body>''')
     with (app / 'i18n.js').open('a') as out:
         out.write('\n' + (root / 'scripts' / 'web-search-strings.js').read_text())
     env = dict(os.environ, USB_AI_WEB_BASE='/ricerca-web/')
