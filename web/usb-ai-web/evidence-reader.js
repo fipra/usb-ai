@@ -36,8 +36,13 @@ export function renderEvidenceAnswer(raw, cards, language = 'en') {
   const selected = [...new Set(ids)].map(id => cards.find(c => c.id === id));
   return selected.length ? label[0] + '\n\n' + selected.map(c => `“${c.quote}” [${c.source}]`).join('\n\n') : label[1];
 }
+export const READABLE_PUBLISHERS = new Set(['www.bbc.com','www.bbc.co.uk','www.theguardian.com','www.ansa.it','tg24.sky.it','www.vaticannews.va','www.ilpost.it','apnews.com','www.reuters.com']);
 export async function readCandidates(entries, endpoint, signal) {
-  return (await Promise.all(entries.slice(0,6).map(async entry => {
+  const seen = new Set();
+  const candidates = entries.filter(entry => {
+    try { const url = new URL(entry.url); url.hash=''; if (url.protocol !== 'https:' || url.username || url.password || url.port || !READABLE_PUBLISHERS.has(url.hostname) || seen.has(url.href)) return false; seen.add(url.href); return true; } catch { return false; }
+  });
+  return (await Promise.all(candidates.slice(0,6).map(async entry => {
     try {
       const response = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:entry.url}),signal});
       if (!response.ok) return null;
@@ -46,4 +51,24 @@ export async function readCandidates(entries, endpoint, signal) {
       return description.length >= 200 ? {...entry,description,kind:'article'} : null;
     } catch (error) { if (signal?.aborted) throw error; return null; }
   }))).filter(Boolean);
+}
+
+// One bounded follow-up when the first documents leave a gap.
+export async function researchArticles(query, language, signal, search) {
+  const first = await search(query, language, signal);
+  const cards = evidenceCards(query, first);
+  const text = cards.map(c=>c.quote).join(' ').toLowerCase();
+  let missing = '';
+  for (const [questionTerm, evidenceTerm, term] of [[/senat[oe]|senate/i,/senat[oe]/i,'Senate'],[/camera|house/i,/camera|house/i,'House']]) {
+    if (questionTerm.test(query) && !evidenceTerm.test(text)) missing += ' ' + term;
+  }
+  if (cards.length && !missing) return first;
+  const alternate = query.replace(/stati uniti/gi,'USA').replace(/elezioni/gi,'election').replace(/medio termine|metà mandato/gi,'midterm').replace(/risultati/gi,'results').replace(/novembre/gi,'November');
+  const followup = (alternate + missing).trim().slice(0,600);
+  if (followup === query.trim()) return first;
+  try {
+    const second = await search(followup, language, signal);
+    const unique = new Map([...first,...second].map(entry=>[entry.url,entry]));
+    return [...unique.values()].slice(0,6);
+  } catch(error) { if(signal?.aborted) throw error; return first; }
 }

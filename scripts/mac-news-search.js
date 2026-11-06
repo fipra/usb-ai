@@ -18,7 +18,7 @@ function newsMatchScore(query, entry) {
   return terms.length > 1 && matches < 2 ? 0 : matches;
 }
 // Google News returns headlines, not the full articles. Treat them accordingly.
-async function searchGoogleNews(query, language, signal) {
+async function searchNewsOnce(query, language, signal) {
   const discovery = fetch('/article-discovery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query}),signal}).then(r=>r.ok?r.json():{}).catch(()=>({}));
   const request = fetch('/news-search', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -69,3 +69,5 @@ const newsStrings = {
   es: ['Tu pregunta y, para consultas posteriores, una pregunta anterior se envían a Google News. Google, BBC, The Guardian y ANSA pueden ver tu IP. El modelo local recibe titulares de Google News y resúmenes RSS de BBC, The Guardian y ANSA, no artículos completos.', 'Los resultados pueden estar incompletos o desactualizados. No se necesita clave API.', 'Privacidad de Google', 'La pregunta se envía a Google News; el modelo funciona en local.']
 };
 for (const [lang, values] of Object.entries(newsStrings)) Object.assign(window.USB_AI_I18N[lang], {webSearchPrivacy: values[0], webSearchFree: values[1], webSearchTerms: values[2], webSearchNotice: values[3]});
+
+async function searchGoogleNews(query, language, signal) { return researchArticles(query, language, signal, searchNewsOnce); }

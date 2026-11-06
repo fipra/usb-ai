@@ -35,3 +35,9 @@ test('article endpoint bounds bodies and disables redirects', async()=>{
  const large=createHandler(async()=>new Response('x'.repeat(1048577),{headers:{'Content-Type':'text/html'}}));
  await large({method:'POST',body:{url:'https://www.bbc.com/news/a'}},res);assert.equal(res.code,502);
 });
+
+test('bounded follow-up searches for missing evidence and deduplicates articles',async()=>{
+ const {researchArticles} = await import('../evidence-reader.js');const queries=[];
+ const results=await researchArticles('risultati elezioni stati uniti 2026','it',undefined,async q=>{queries.push(q);return queries.length===1?[]:entries});
+ assert.equal(queries.length,2);assert.match(queries[1],/election/);assert.equal(results.length,1);
+});

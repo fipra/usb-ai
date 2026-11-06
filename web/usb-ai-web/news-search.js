@@ -1,4 +1,4 @@
-import { readCandidates } from './evidence-reader.js';
+import { readCandidates, researchArticles } from './evidence-reader.js';
 export function prepareNewsResults(results) {
   const clean = value => value.replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
   return results.flatMap(result => {
@@ -8,7 +8,7 @@ export function prepareNewsResults(results) {
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return [];
     const title = clean(result.title).slice(0, 150), description = clean(result.description).slice(0, 1800);
     return title && description ? [{title, url:url.href, description, kind:result.kind, date:result.date}] : [];
-  }).slice(0, 3);
+  }).slice(0, 6);
 }
 export function newsQuestion(question, results) {
   const date = new Date().toLocaleDateString('en-CA');
@@ -24,7 +24,7 @@ export function newsMatchScore(query, entry) {
   return terms.length > 1 && matches < 2 ? 0 : matches;
 }
 // Google News returns headlines, not the full articles. Treat them accordingly.
-export async function searchGoogleNews(query, language, signal) {
+async function searchNewsOnce(query, language, signal) {
   const response = await fetch('/api/rss-news', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query, language}), signal, credentials:'same-origin'});
   if (!response.ok) throw Error('WEB_SEARCH_FAILED');
   const payload = await response.json();
@@ -58,3 +58,5 @@ export async function searchGoogleNews(query, language, signal) {
   const selected = ranked.filter(x => x.score > 0 && !x.entry.url.includes('news.google.com')).map(x => x.entry);
   return readCandidates(selected, '/api/read-article', signal);
 }
+
+export async function searchGoogleNews(query, language, signal) { return researchArticles(query, language, signal, searchNewsOnce); }

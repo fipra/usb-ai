@@ -9,6 +9,7 @@ test('news search sends the query locally and excludes headline-only sources', a
   const context = vm.createContext({URL, window:{USB_AI_I18N:{en:{},it:{},fr:{},de:{},es:{}}},
     DOMParser: class { parseFromString() { return {querySelector: () => null, querySelectorAll: () => [item]}; } },
     readCandidates: async rows => rows,
+    researchArticles: async (query,lang,signal,search) => search(query,lang,signal),
     fetch: async (url, options) => { calls.push({url, options}); return {ok:true, text:async()=>'<rss />'}; }
   });
   vm.runInContext(fs.readFileSync('scripts/mac-news-search.js', 'utf8'), context);
