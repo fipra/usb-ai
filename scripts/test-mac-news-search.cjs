@@ -5,10 +5,11 @@ const fs = require('node:fs');
 
 test('news search sends the query locally and excludes headline-only sources', async () => {
   const calls = [];
-  const item = {querySelector: name => ({textContent: {title:'Election results - Example', link:'https://news.google.com/articles/example', pubDate:'Fri, 06 Nov 2026 06:00:00 GMT'}[name]})};
+  const item = {querySelector: name => name==='source'?null:({textContent: {title:'Election results - Example', link:'https://news.google.com/articles/example', pubDate:'Fri, 06 Nov 2026 06:00:00 GMT'}[name]})};
   const context = vm.createContext({URL, window:{USB_AI_I18N:{en:{},it:{},fr:{},de:{},es:{}}},
     DOMParser: class { parseFromString() { return {querySelector: () => null, querySelectorAll: () => [item]}; } },
     readCandidates: async rows => rows,
+    discoverPublisherArticles: async () => [],
     researchArticles: async (query,lang,signal,search) => search(query,lang,signal),
     fetch: async (url, options) => { calls.push({url, options}); return {ok:true, text:async()=>'<rss />'}; }
   });
