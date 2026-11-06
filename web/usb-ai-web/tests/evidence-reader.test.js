@@ -181,3 +181,17 @@ test('selection grammar permits only the provided evidence identifiers',()=>{
  const grammar=evidenceGrammar([{id:'E1'},{id:'E2'}]);
  assert.ok(grammar.includes('E1')&&grammar.includes('E2'));assert.ok(!grammar.includes('E3'));assert.ok(grammar.includes('root ::='));
 });
+
+test('one publisher fetch checks later current headlines when its first title is absent',async()=>{
+ const {discoverPublisherArticles}=await import('../evidence-reader.js');
+ const oldFetch=globalThis.fetch,oldParser=globalThis.DOMParser;let calls=0;
+ try{
+  globalThis.fetch=async()=>{calls++;return new Response(JSON.stringify({html:'fixture'}));};
+  globalThis.DOMParser=class{parseFromString(){return {querySelectorAll:()=>[{textContent:'Commission publishes current final election counts',getAttribute:name=>name==='href'?'/current-report':null}]}}};
+  const result=await discoverPublisherArticles([
+   {title:'Earlier coalition negotiations reported yesterday - Publisher',publisher:'https://publisher.org'},
+   {title:'Commission publishes current final election counts - Publisher',publisher:'https://publisher.org'}
+  ],'/test');
+  assert.equal(calls,1);assert.equal(result.length,1);assert.equal(result[0].url,'https://publisher.org/current-report');
+ }finally{globalThis.fetch=oldFetch;globalThis.DOMParser=oldParser;}
+});
