@@ -6,7 +6,7 @@ export function extractArticle(html) {
   const main = doc.querySelector('main');
   const roots = main ? [main] : Array.from(doc.querySelectorAll('article'));
   if (!roots.length) return '';
-  return roots.flatMap(root => Array.from(root.querySelectorAll('p'))).map(p => p.textContent.replace(/\s+/g,' ').trim()).filter(p => p.length >= 80).join('\n').slice(0, 24000);
+  return roots.flatMap(root => Array.from(root.querySelectorAll('p'))).map(p => p.textContent.replace(/\s+/g,' ').trim()).filter(p => p.length >= 20).join('\n').slice(0, 80000);
 }
 export function evidenceCards(question, entries) {
   const normalize = s => s.toLowerCase().normalize('NFKD').replace(/\p{M}/gu,'').replace(/stati uniti|united states|usa|u\.s\./g,'usa').replace(/elezioni|elections/g,'election').replace(/\b(?:vinto|vittoria|won|wins|winning|winners?)\b/g,'won');
@@ -21,7 +21,7 @@ export function evidenceCards(question, entries) {
     if (years.length && !years.some(y => text.includes(y))) return;
     const matches = terms.filter(t => text.includes(t)).length;
     if (matches < Math.min(2, terms.length) || !terms.length) return;
-    const passages = entry.description.split(/\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ý])/u).filter(p => p.length >= 70 && p.length <= 1100).filter(p => { const mentioned = p.match(/\b20\d{2}\b/g) || []; return !years.length || !mentioned.length || mentioned.some(y => years.includes(y)); });
+    const passages = entry.description.split(/\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ý])/u).filter(p => p.length >= 30 && p.length <= 1100).filter(p => { const mentioned = p.match(/\b20\d{2}\b/g) || []; return !years.length || !mentioned.length || mentioned.some(y => years.includes(y)); });
     passages.filter(p => !needsElectionOutcome || /\bwon\b|\bwins?\b|majorit|\bseats\b|vinto|vittori|maggioranza|\bseggi\b|sweep|control|defeat/i.test(p)).map((quote, order) => ({quote,order,score:terms.filter(t => normalize(quote).includes(t)).length})).filter(p => p.score > 0).sort((a,b)=>b.score-a.score || a.order-b.order).slice(0,2).forEach(p => cards.push({id:`E${cards.length+1}`,source:source+1,quote:p.quote,title:entry.title,url:entry.url,date:entry.date || ''}));
   });
   return cards.slice(0,6);
