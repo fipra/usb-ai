@@ -1,5 +1,5 @@
 // Shared by browser and native experiments. Documents remain untrusted data.
-export const READER_VERSION = 'evidence-reader-3.2';
+export const READER_VERSION = 'evidence-reader-3.2.1';
 export const NEWS_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 export function historicalNewsQuery(query, now=Date.now()) {
   const year=new Date(now).getFullYear();
@@ -178,7 +178,7 @@ export async function discoverPublisherArticles(headlines,endpoint,signal) {
       const doc=new DOMParser().parseFromString(payload.html,'text/html');
       const links=Array.from(doc.querySelectorAll('a[href]')).map(a=>({href:a.getAttribute('href'),text:a.textContent+' '+(a.getAttribute('aria-label')||'')}));
       const url=publisherArticleLink(headline,links);
-      return url?{...headline,url,discovered:true}:null;
+      return url?{...headline,url,discovered:true,publisherResolved:true}:null;
     }catch(error){if(signal?.aborted)throw error;return null;}
     finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
   }))).filter(Boolean);
