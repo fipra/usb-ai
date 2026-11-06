@@ -3,12 +3,13 @@ export const READER_VERSION = 'evidence-reader-1';
 export function extractArticle(html) {
   const doc = new DOMParser().parseFromString(html.slice(0, 1048576), 'text/html');
   for (const element of doc.querySelectorAll('script,style,nav,header,footer,aside,form,iframe,noscript')) element.remove();
-  const article = doc.querySelector('article') || doc.querySelector('main');
-  if (!article) return '';
-  return Array.from(article.querySelectorAll('p')).map(p => p.textContent.replace(/\s+/g,' ').trim()).filter(p => p.length >= 80).join('\n').slice(0, 24000);
+  const main = doc.querySelector('main');
+  const roots = main ? [main] : Array.from(doc.querySelectorAll('article'));
+  if (!roots.length) return '';
+  return roots.flatMap(root => Array.from(root.querySelectorAll('p'))).map(p => p.textContent.replace(/\s+/g,' ').trim()).filter(p => p.length >= 80).join('\n').slice(0, 24000);
 }
 export function evidenceCards(question, entries) {
-  const normalize = s => s.toLowerCase().normalize('NFKD').replace(/\p{M}/gu,'').replace(/stati uniti|united states|usa|u\.s\./g,'usa').replace(/elezioni|elections/g,'election');
+  const normalize = s => s.toLowerCase().normalize('NFKD').replace(/\p{M}/gu,'').replace(/stati uniti|united states|usa|u\.s\./g,'usa').replace(/elezioni|elections/g,'election').replace(/\b(?:vinto|vittoria|won|wins|winning|winners?)\b/g,'won');
   const stop = new Set(['chi','che','delle','della','the','and','what','risultati','results','novembre','november']);
   const terms = [...new Set(normalize(question).match(/[\p{L}\p{N}]{3,}/gu) || [])].filter(t => !stop.has(t));
   const years = question.match(/\b20\d{2}\b/g) || [];
