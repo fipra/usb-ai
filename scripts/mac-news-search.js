@@ -10,10 +10,10 @@ function prepareNewsResults(results) {
   }).slice(0, 3);
 }
 function newsMatchScore(query, entry) {
-  const stop = new Set(['delle','della','degli','dello','dalla','sono','quale','cerca','risultati','notizie','the','and','what','when','news','results','from','with','about','this','that','pour','dans','avec','para','las','los','como','oder','die','der','und']);
-  const tokens = value => (value.toLowerCase().replace(/elezioni|elections|wahl|élections|elecciones/g,'election').replace(/medio termine|metà mandato|midterms/g,'midterm').replace(/\b(?:stati\s+uniti|united\s+states|u\.?s\.?a?\.?)\b/g, ' usa ').match(/[\p{L}\p{N}]{3,}/gu) || []);
+  const stop = new Set(['sulle','sugli','sulla','sul','delle','della','degli','dello','dalla','sono','quale','cerca','risultati','notizie','the','and','what','when','news','results','from','with','about','this','that','pour','dans','avec','para','las','los','como','oder','die','der','und']);
+  const tokens = value => (value.toLowerCase().replace(/israele|israelischen|israéliennes|israelíes/g,'israel').replace(/elezioni|elections|wahl|élections|elecciones/g,'election').replace(/medio termine|metà mandato|midterms/g,'midterm').replace(/\b(?:stati\s+uniti|united\s+states|u\.?s\.?a?\.?)\b/g, ' usa ').match(/[\p{L}\p{N}]{3,}/gu) || []);
   const terms = [...new Set(tokens(query).filter(x => !stop.has(x) && !/^\d{4}$/.test(x)))];
-  const words = new Set(tokens(entry.title + ' ' + entry.description.split(': ').slice(1).join(': ')));
+  const words = new Set(tokens(entry.title + ' ' + entry.description));
   const matches = terms.filter(term => words.has(term)).length;
   return terms.length > 1 && matches < 2 ? 0 : matches;
 }
@@ -54,10 +54,10 @@ async function searchNewsOnce(query, language, signal) {
   }
   const payload = await discovery;
   for (const item of Array.isArray(payload.results) ? payload.results.slice(0,10) : []) {
-    if (typeof item.title === 'string' && typeof item.url === 'string') entries.push({title:item.title,url:item.url,description:typeof item.description === 'string' ? item.description : ''});
+    if (typeof item.title === 'string' && typeof item.url === 'string') entries.push({discovered:true,title:item.title,url:item.url,description:typeof item.description === 'string' ? item.description : ''});
   }
   const ranked = entries.map((entry, i) => ({entry, i, score:newsMatchScore(query, entry)})).sort((a,b) => b.score-a.score || Number(b.entry.description.startsWith('RSS summary;')) - Number(a.entry.description.startsWith('RSS summary;')) || a.i-b.i);
-  const selected = ranked.filter(x => x.score > 0 && !x.entry.url.includes('news.google.com')).map(x => x.entry);
+  const selected = ranked.filter(x => (x.score > 0 || x.entry.discovered) && !x.entry.url.includes('news.google.com')).map(x => x.entry);
   return readCandidates(selected, '/read-article', signal);
 }
 
