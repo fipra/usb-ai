@@ -47,3 +47,8 @@ test('publication date supplies year context; historical passages remain exclude
  const cards=evidenceCards('USA election 2026',[article]);
  assert.ok(cards.length);assert.ok(cards.every(c=>!c.quote.includes('2018')));
 });
+
+test('election outcome questions exclude speculation about the next race',()=>{
+ const entry={...entries[0],date:'2026-11-04',description:'With the dust still settling on the USA midterm election results, attention is already turning to the Republicans who might seek to lead the party into the next presidential race. This analysis discusses possible candidates and campaign strategy for the next election.'};
+ assert.equal(evidenceCards('USA midterm election results 2026',[entry]).length,0);
+});

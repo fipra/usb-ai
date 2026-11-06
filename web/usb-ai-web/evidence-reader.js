@@ -12,6 +12,7 @@ export function evidenceCards(question, entries) {
   const stop = new Set(['chi','che','delle','della','the','and','what','risultati','results','novembre','november']);
   const terms = [...new Set(normalize(question).match(/[\p{L}\p{N}]{3,}/gu) || [])].filter(t => !stop.has(t));
   const years = question.match(/\b20\d{2}\b/g) || [];
+  const needsElectionOutcome = /elezion|election|midterm/i.test(question) && /vinto|vincitor|risultat|won|winner|results/i.test(question);
   const cards = [];
   entries.forEach((entry, source) => {
     if (entry.kind !== 'article' || !entry.description || entry.description.length < 200) return;
@@ -20,7 +21,7 @@ export function evidenceCards(question, entries) {
     const matches = terms.filter(t => text.includes(t)).length;
     if (matches < Math.min(2, terms.length) || !terms.length) return;
     const passages = entry.description.split(/\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ý])/u).filter(p => p.length >= 70 && p.length <= 1100).filter(p => { const mentioned = p.match(/\b20\d{2}\b/g) || []; return !years.length || !mentioned.length || mentioned.some(y => years.includes(y)); });
-    passages.map((quote, order) => ({quote,order,score:terms.filter(t => normalize(quote).includes(t)).length})).filter(p => p.score > 0).sort((a,b)=>b.score-a.score || a.order-b.order).slice(0,2).forEach(p => cards.push({id:`E${cards.length+1}`,source:source+1,quote:p.quote,title:entry.title,url:entry.url,date:entry.date || ''}));
+    passages.filter(p => !needsElectionOutcome || /\bwon\b|\bwins?\b|majorit|\bseats\b|vinto|vittori|maggioranza|\bseggi\b|sweep|control|defeat/i.test(p)).map((quote, order) => ({quote,order,score:terms.filter(t => normalize(quote).includes(t)).length})).filter(p => p.score > 0).sort((a,b)=>b.score-a.score || a.order-b.order).slice(0,2).forEach(p => cards.push({id:`E${cards.length+1}`,source:source+1,quote:p.quote,title:entry.title,url:entry.url,date:entry.date || ''}));
   });
   return cards.slice(0,6);
 }
@@ -65,8 +66,10 @@ export async function researchArticles(query, language, signal, search) {
   for (const [questionTerm, evidenceTerm, term] of [[/senat[oe]|senate/i,/senat[oe]/i,'Senate'],[/camera|house/i,/camera|house/i,'House']]) {
     if (questionTerm.test(query) && !evidenceTerm.test(text)) missing += ' ' + term;
   }
-  if (cards.length && !missing) return first;
-  const alternate = query.replace(/stati uniti/gi,'USA').replace(/elezioni/gi,'election').replace(/medio termine|metà mandato/gi,'midterm').replace(/risultati/gi,'results').replace(/novembre/gi,'November');
+  const asksOutcome = /vinto|vincitor|risultat|won|winner|results/i.test(query);
+  const hasOutcome = /\bwon\b|\bwins?\b|majorit|\bseats\b|vinto|vittori|maggioranza|\bseggi\b/i.test(text);
+  if (cards.length && !missing && (!asksOutcome || hasOutcome)) return first;
+  const alternate = query.replace(/chi ha vinto(?: le)?/gi,'winners').replace(/stati uniti/gi,'USA').replace(/elezioni/gi,'election').replace(/medio termine|metà mandato/gi,'midterm').replace(/risultati/gi,'results').replace(/novembre/gi,'November');
   const followup = (alternate + missing).trim().slice(0,600);
   if (followup === query.trim()) return first;
   try {
