@@ -35,10 +35,10 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
       try { entries = await searchGoogleNews(searchQuery, language, controller.signal); }
       catch (error) { if (controller.signal.aborted) throw error; throw Error(error.message === 'WEB_SEARCH_LIMIT' ? tr('webSearchLimit') : tr('webSearchError')); }
       if (!entries.length) throw Error(tr('webSearchEmpty'));
+      answer.sources = [];
       answer.webSources = entries;
       answer.evidenceCards = evidenceCards(text, entries);
       if (!answer.evidenceCards.length) throw Error(tr('webSearchEmpty'));
-      answer.webSources = entries.map((entry, i) => ({...entry, description:answer.evidenceCards.filter(c => c.source === i+1).map(c => c.quote).join('\\n')}));
       for (const context of contexts) {
         // Evidence selection is independent of unrelated chat history.
         context.splice(0, context.length, {role:'user', content:evidencePrompt(text, answer.evidenceCards)});

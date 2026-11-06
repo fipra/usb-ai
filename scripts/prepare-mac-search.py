@@ -121,6 +121,7 @@ replace(rust, '        let (code, mime, body) = if method == Method::Post && url
             }
         } else if method == Method::Post && url == "/news-search" {''')
 replace(rust, '        sources.extend(web_sources);', '''        let answer = if web_sources.is_empty() { answer } else { render_evidence_answer(&answer, &web_sources, self.language()) };
+        if !web_sources.is_empty() { sources.clear(); }
         sources.extend(web_sources);''')
 # The model selects evidence; only literal source passages can reach the saved answer.
 data = rust.read_text()
