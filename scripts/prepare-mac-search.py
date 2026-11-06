@@ -29,7 +29,7 @@ rust = dest / 'src/main.rs'
 replace(rust, '        let sources = if use_docs {', '        let mut sources = if use_docs {')
 replace(rust, '        let direct_notes = if use_docs {', '''        let mut web_sources: Vec<Source> = Vec::new();
         if let Some(items) = data.get("webSources").and_then(Value::as_array) {
-            if items.len() > 3 { return Err("Too many web sources".into()); }
+            if items.len() > 6 { return Err("Too many web sources".into()); }
             for item in items {
                 let title = item["title"].as_str().ok_or("Invalid web title")?;
                 let url = item["url"].as_str().ok_or("Invalid web URL")?;
@@ -98,7 +98,7 @@ news_js = (helpers / 'scripts/mac-news-search.js').read_text() + '\n' + (helpers
 replace(html, '    function newRequestId(){', js + '\n' + strings + '\n' + news_js + '\n' + ui + '\n    function newRequestId(){')
 replace(html, "function render(){if(!state)return;translateStatic();", "function render(){if(!state)return;translateStatic();renderWebSearch();")
 replace(html, "const chatId=active,requestId=activeRequestId,chat=state.chats.find(item=>item.id===chatId);", "const chatId=active,requestId=activeRequestId,chat=state.chats.find(item=>item.id===chatId);const webHistory=edit?chat.messages.slice(0,edit.index):chat.messages.slice();")
-replace(html, "try{state=await callStream({chatId,requestId,text,documents:true,editIndex:edit?.index},", "try{let webSources=[];if(webSearchEnabled){if(text.length>600||text.trim().split(/\\s+/).length>75)throw Error(tr('webSearchLong'));showWait(tr('webSearchSearching'));webSearchController=new AbortController();try{webSources=await searchWeb(webSearchQuery(text,webHistory),webSearchController.signal)}catch(error){if(error.name==='AbortError')throw error;throw Error(error.message==='WEB_SEARCH_LIMIT'?tr('webSearchLimit'):tr('webSearchError'))}finally{webSearchController=null}if(!webSources.length)throw Error(tr('webSearchEmpty'))}state=await callStream({chatId,requestId,text,webSources,webDate:new Date().toLocaleDateString('en-CA'),documents:true,editIndex:edit?.index},")
+replace(html, "try{state=await callStream({chatId,requestId,text,documents:true,editIndex:edit?.index},", "try{let webSources=[];if(webSearchEnabled){if(text.length>600||text.trim().split(/\\s+/).length>75)throw Error(tr('webSearchLong'));showWait(tr('webSearchSearching'));webSearchController=new AbortController();try{webSources=await searchWeb(webSearchQuery(text,webHistory),webSearchController.signal)}catch(error){if(error.name==='AbortError')throw error;throw Error(error.message==='WEB_SEARCH_LIMIT'?tr('webSearchLimit'):tr('webSearchError'))}finally{webSearchController=null}if(!webSources.length)throw Error(tr('webSearchEmpty'))}state=await callStream({chatId,requestId,text,webSources,nationalOutcome:nationalOutcomeQuestion(text),webDate:new Date().toLocaleDateString('en-CA'),documents:true,editIndex:edit?.index},")
 replace(html, 'webSources=await searchWeb(webSearchQuery(text,webHistory),webSearchController.signal)', 'webSources=await searchGoogleNews(webSearchQuery(text,webHistory),state.language,webSearchController.signal)')
 replace(html, 'https://puri.li/terms', 'https://policies.google.com/privacy')
 replace(html, "$('stop').onclick=()=>run(async()=>{if(!busy||!activeRequestId)return;", "$('stop').onclick=()=>run(async()=>{if(webSearchController){webSearchController.abort();return}if(!busy||!activeRequestId)return;")
@@ -106,7 +106,7 @@ replace(html, "details.append(el('summary',`[${index+1}] ${source.name}${source.
 # Shared evidence extraction and strict model-output rendering.
 reader = (helpers / 'web/usb-ai-web/evidence-reader.js').read_text().replace('export ', '')
 replace(html, '    function newRequestId(){', reader + '\n    function newRequestId(){')
-replace(html, "if(!webSources.length)throw Error(tr('webSearchEmpty'))", "const cards=evidenceCards(text,webSources).slice(0,3);webSources=cards.map(c=>({title:c.title,url:c.url,description:c.quote}));if(!webSources.length)throw Error(tr('webSearchEmpty'))")
+replace(html, "if(!webSources.length)throw Error(tr('webSearchEmpty'))", "const cards=evidenceCards(text,webSources);webSources=cards.map(c=>({title:c.title,url:c.url,description:c.quote}));if(!webSources.length)throw Error(tr('webSearchEmpty'))")
 replace(html, 'delta=>{answer.text+=delta;', 'delta=>{if(webSearchEnabled)return;answer.text+=delta;')
 with rust.open('a') as out:
     out.write('\n' + (helpers / 'scripts/mac-evidence-reader.rs').read_text())
@@ -120,7 +120,7 @@ replace(rust, '        let (code, mime, body) = if method == Method::Post && url
                 match result { Ok(body) => (200, "application/json", body), Err(_) => (502, "application/json", b"{}".to_vec()) }
             }
         } else if method == Method::Post && url == "/news-search" {''')
-replace(rust, '        sources.extend(web_sources);', '''        let answer = if web_sources.is_empty() { answer } else { render_evidence_answer(&answer, &web_sources, self.language()) };
+replace(rust, '        sources.extend(web_sources);', '''        let answer = if web_sources.is_empty() { answer } else { render_evidence_answer(&answer, &web_sources, self.language(), data["nationalOutcome"].as_bool().unwrap_or(false)) };
         if !web_sources.is_empty() { sources.clear(); }
         sources.extend(web_sources);''')
 # The model selects evidence; only literal source passages can reach the saved answer.
