@@ -10,7 +10,7 @@ export function createHandler(fetcher = fetch) {
     const url = req.body?.url;
     if (typeof url !== 'string' || !allowedArticle(url)) return res.status(400).json({error:'INVALID_ARTICLE'});
     try {
-      const response = await fetcher(url,{redirect:'error',signal:AbortSignal.timeout(8000)});
+      const response = await fetcher(url,{redirect:'error',credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(8000)});
       if (!response.ok || !/text\/html/i.test(response.headers.get('content-type') || '') || Number(response.headers.get('content-length') || 0) > 1048576) throw Error();
       const reader = response.body.getReader(); const chunks=[]; let size=0;
       while (true) { const {value,done}=await reader.read(); if(done) break; size+=value.length; if(size>1048576){await reader.cancel();throw Error();} chunks.push(value); }
