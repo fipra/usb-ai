@@ -1,0 +1,30 @@
+name: Build model-directed web test download
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/agent-prism-fast.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch official source
+        run: git fetch --no-tags --depth 1 origin 7bcd90bf98478a3c83432b57fe3137dc7c496f5c
+      - name: Build isolated Prism experiment
+        run: bash scripts/build-agent-web.sh
+      - name: Package and verify launcher permissions
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent release/LlamaNest-Prism-Agent-Web-Mac-Apple-Silicon LlamaNest-Prism-Agent-Web-Mac-Apple-Silicon.zip
+          ditto -x -k LlamaNest-Prism-Agent-Web-Mac-Apple-Silicon.zip "$RUNNER_TEMP/check"
+          test -x "$RUNNER_TEMP/check/LlamaNest-Prism-Agent-Web-Mac-Apple-Silicon/Avvia LlamaNest.command"
+          test -x "$RUNNER_TEMP/check/LlamaNest-Prism-Agent-Web-Mac-Apple-Silicon/bin/prism/llama-server"
+      - name: Publish experimental download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "prism-agent-prova-${GITHUB_SHA}" LlamaNest-Prism-Agent-Web-Mac-Apple-Silicon.zip --target "$GITHUB_SHA" --title 'Prova Mac: ricerca richiesta dal modello' --notes 'Esperimento per prova manuale. Test completo con ToolMind ancora in corso. Modello GGUF non incluso.' --prerelease
