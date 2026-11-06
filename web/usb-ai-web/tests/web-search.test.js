@@ -57,3 +57,12 @@ test('short requests for percentages retain the user topic, including the report
  for(const q of ['percentuali inflazione Italia','chi è Giorgia Meloni?','cerca le percentuali di disoccupazione in Francia']) assert.equal(webSearchQuery(q,history),q);
  assert.equal(webSearchQuery('e i numeri?',[...history,{role:'user',text:'mi si cercare le percentuali??'}]),`${topic} e i numeri?`);
 });
+
+test('context follows several formulations but never imports assistant claims',async()=>{
+ const {webResearchPlan}=await import('../web-search.js');
+ const history=[{role:'user',text:'elezioni USA novembre 2026'},{role:'assistant',text:'Invented names and 99%'}];
+ for(const q of ['in che percentuale hanno vinto','che percentuale hanno ottenuto?','quanti voti hanno preso?','how many votes did they receive?']){
+  const plan=webResearchPlan(q,history);assert.equal(plan.inherited,true,q);assert.match(plan.question,/elezioni USA novembre 2026/);assert.doesNotMatch(plan.question,/99|Invented/);
+ }
+ assert.equal(webResearchPlan('percentuale inflazione Germania',history).inherited,false);
+});
