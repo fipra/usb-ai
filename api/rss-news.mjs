@@ -1,5 +1,5 @@
 // Only fixed public feed URLs are fetched. Browser-provided URLs are never used.
-const feeds = ['https://feeds.bbci.co.uk/news/world/rss.xml', 'https://www.theguardian.com/world/rss', 'https://www.ansa.it/sito/ansait_rss.xml'];
+const feeds = ['https://feeds.bbci.co.uk/news/world/rss.xml', 'https://www.theguardian.com/world/rss', 'https://www.ansa.it/sito/ansait_rss.xml', 'https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml', 'https://www.theguardian.com/us-news/rss'];
 export function createHandler(fetcher = fetch) {
   return async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
@@ -20,9 +20,21 @@ export function createHandler(fetcher = fetch) {
         return new TextDecoder().decode(joined);
       } catch { return null; }
     };
+    const discovery = (async () => {
+      try {
+        const response = await fetcher('https://puri.li/api/search', {method:'POST',redirect:'error',headers:{'Content-Type':'application/json'},body:JSON.stringify({q:query.trim()}),signal:AbortSignal.timeout(8000)});
+        if (!response.ok || Number(response.headers.get('content-length') || 0) > 1048576) return [];
+        const reader = response.body.getReader(); const chunks=[]; let size=0;
+        while(true) { const {done,value}=await reader.read(); if(done) break; size+=value.length; if(size>1048576){await reader.cancel();return [];} chunks.push(value); }
+        const bytes=new Uint8Array(size); let offset=0;for(const c of chunks){bytes.set(c,offset);offset+=c.length;}
+        const data=JSON.parse(new TextDecoder().decode(bytes));
+        return Array.isArray(data.results) ? data.results.slice(0,10) : [];
+      } catch { return []; }
+    })();
     const [google, ...rss] = await Promise.all([url.href, ...feeds].map(get));
-    if (!google && rss.every(x => !x)) return res.status(502).json({error:'NEWS_UNAVAILABLE'});
-    return res.status(200).json({google, feeds:rss.filter(Boolean)});
+    const results = await discovery;
+    if (!google && rss.every(x => !x) && !results.length) return res.status(502).json({error:'NEWS_UNAVAILABLE'});
+    return res.status(200).json({google, feeds:rss.filter(Boolean), results});
   };
 }
 export default createHandler();
