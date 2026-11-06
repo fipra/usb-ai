@@ -1,12 +1,13 @@
-import { readCandidates, researchArticles, discoverPublisherArticles } from './evidence-reader.js';
-export function prepareNewsResults(results) {
+import { readCandidates, researchArticles, discoverPublisherArticles, historicalNewsQuery, isRecentNewsDate, sourceDateLabel } from './evidence-reader.js';
+export function prepareNewsResults(results, language='en') {
   const clean = value => value.replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
   return results.flatMap(result => {
     if (!result || typeof result.title !== 'string' || typeof result.url !== 'string' || typeof result.description !== 'string') return [];
     let url;
     try { url = new URL(result.url); } catch { return []; }
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return [];
-    const title = clean(result.title).slice(0, 150), description = clean(result.description).slice(0, 1800);
+    const date = sourceDateLabel(result.date, language);
+    const title = clean(result.title).slice(0, 150) + (date ? ` · ${date}` : ''), description = clean(result.description).slice(0, 1800);
     return title && description ? [{title, url:url.href, description, kind:result.kind, date:result.date}] : [];
   }).slice(0, 6);
 }
@@ -24,7 +25,7 @@ export function newsMatchScore(query, entry) {
   return terms.length > 1 && matches < 2 ? 0 : matches;
 }
 // Google News returns headlines, not the full articles. Treat them accordingly.
-async function searchNewsOnce(query, language, signal) {
+async function searchNewsOnce(query, language, signal, fresh=false) {
   const response = await fetch('/api/rss-news', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query, language}), signal, credentials:'same-origin'});
   if (!response.ok) throw Error('WEB_SEARCH_FAILED');
   const payload = await response.json();
@@ -54,11 +55,13 @@ async function searchNewsOnce(query, language, signal) {
   for (const item of Array.isArray(payload.results) ? payload.results.slice(0,10) : []) {
     if (typeof item.title === 'string' && typeof item.url === 'string') entries.push({discovered:true,title:item.title,url:item.url,description:typeof item.description === 'string' ? item.description : ''});
   }
-  const resolved = await discoverPublisherArticles(entries.filter(e=>e.publisher), '/api/read-article', signal);
-  entries.unshift(...resolved);
-  const ranked = entries.map((entry, i) => ({entry, i, score:newsMatchScore(query, entry)})).sort((a,b) => b.score-a.score || Number(b.entry.description.startsWith('RSS summary;')) - Number(a.entry.description.startsWith('RSS summary;')) || a.i-b.i);
+  const recent = entries.filter(e=>historicalNewsQuery(query) || (!(e.publisher || e.description.startsWith('RSS summary;')) || isRecentNewsDate(e.date)));
+  const resolved = await discoverPublisherArticles(recent.filter(e=>e.publisher), '/api/read-article', signal);
+  recent.unshift(...resolved);
+  const ranked = recent.map((entry, i) => ({entry, i, score:newsMatchScore(query, entry)})).sort((a,b) => b.score-a.score || Number(b.entry.description.startsWith('RSS summary;')) - Number(a.entry.description.startsWith('RSS summary;')) || a.i-b.i);
   const selected = ranked.filter(x => (x.score > 0 || x.entry.discovered) && !x.entry.url.includes('news.google.com')).map(x => x.entry);
-  return readCandidates(selected, '/api/read-article', signal);
+  const articles = await readCandidates(selected, '/api/read-article', signal);
+  return fresh ? articles.filter(entry=>isRecentNewsDate(entry.date)) : articles;
 }
 
 export async function searchGoogleNews(query, language, signal) { return researchArticles(query, language, signal, searchNewsOnce); }
