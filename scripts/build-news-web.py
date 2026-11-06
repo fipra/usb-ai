@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
     (work / 'node_modules').symlink_to(web / 'node_modules', target_is_directory=True)
     app = work / 'usb-ai-web'
     main = app / 'main.js'
-    replace(main, "import './style.css';", "import './style.css';\nimport { prepareWebResults, webSearchQuery } from './web-search.js';\nimport { searchGoogleNews, newsQuestion } from './news-search.js';")
+    replace(main, "import './style.css';", "import './style.css';\nimport { webSearchQuery } from './web-search.js';\nimport { searchGoogleNews, newsQuestion, prepareNewsResults } from './news-search.js';")
     replace(main, 'let thinking = false, semanticEnabled = false;', 'let thinking = false, semanticEnabled = false;\nlet webSearchEnabled = false;')
     replace(main, "$('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');", "renderWebSearch(); $('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');")
     replace(main, "  $('semantic-toggle').disabled = value;", "  $('semantic-toggle').disabled = value;\n  $('web-search-toggle').disabled = value;")
@@ -46,9 +46,9 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
     replace(main, "if (message.text) content.append(messageActions(chat, message));", """if (message.webSources?.length) {
   const details = node('details', undefined, 'source');
   details.append(node('summary', `${tr('webSearchSources')} (${message.webSources.length})`));
-  for (const [index, source] of prepareWebResults(message.webSources).entries()) {
+  for (const [index, source] of prepareNewsResults(message.webSources).entries()) {
     const row = node('p'); const link = node('a', `[${index + 1}] ${source.title}`);
-    link.href = source.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; row.append(link); details.append(row);
+    link.href = source.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; row.append(link); row.append(node('div', source.description)); details.append(row);
   }
   content.append(details);
 } if (message.text) content.append(messageActions(chat, message));""")
