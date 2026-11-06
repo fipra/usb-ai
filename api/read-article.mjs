@@ -29,7 +29,7 @@ export async function fetchPublicArticle(value, options={}) {
   for(let hop=0;hop<=2;hop++) {
     const address=await resolvePublic(url);signal.throwIfAborted();
     const response=await new Promise((resolve,reject)=>{
-      const req=https.get(url,{signal,headers:{Accept:'text/html,application/xhtml+xml'},lookup:(_host,opts,cb)=>opts.all?cb(null,[{address,family:4}]):cb(null,address,4)},res=>{
+      const req=https.get(url,{signal,headers:{Accept:'text/html,application/xhtml+xml','User-Agent':'LlamaNest/4 (local research assistant)'},lookup:(_host,opts,cb)=>opts.all?cb(null,[{address,family:4}]):cb(null,address,4)},res=>{
         if([301,302,303,307,308].includes(res.statusCode)) {res.resume();resolve({redirect:res.headers.location});return;}
         if(res.statusCode!==200||!/text\/html|application\/xhtml\+xml/i.test(res.headers['content-type']||'')||Number(res.headers['content-length']||0)>1048576){res.destroy();reject(Error('ARTICLE_UNAVAILABLE'));return;}
         let size=0;const chunks=[];
