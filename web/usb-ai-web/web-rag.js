@@ -152,7 +152,8 @@ export function terms(text) {
 
 // BM25 over chunks. Query terms come from the question AND the planned
 // queries, so an Italian question still matches English pages.
-export function rankChunks(chunks, queryText, {k1 = 1.4, b = 0.75} = {}) {
+export function rankChunks(chunks, queryText, {k1 = 1.4, b = 0.75, subject = ''} = {}) {
+  const subjectTerms = [...new Set(terms(subject))];
   const docs = chunks.map(c => terms(c.title + ' ' + c.text));
   const avg = docs.reduce((s, d) => s + d.length, 0) / Math.max(1, docs.length);
   const df = new Map();
@@ -176,6 +177,9 @@ export function rankChunks(chunks, queryText, {k1 = 1.4, b = 0.75} = {}) {
     const titleTerms = new Set(terms(chunk.title || ''));
     const titleHits = query.filter(t => titleTerms.has(t)).length;
     score *= 1 + 0.5 * titleHits / Math.max(1, query.length);
+    // Pages about the conversation's subject beat pages that only mention it.
+    if (subjectTerms.length && subjectTerms.every(t => titleTerms.has(t))) score *= 2;
+    else if (subjectTerms.length && !subjectTerms.every(t => docs[i].includes(t))) score *= 0.5;
     score *= 1 + 0.6 * (chunk.prior ?? 0.5);
     // A page titled with other years only is likely about another edition.
     const titleYears = (chunk.title || '').match(/\b(?:19|20)\d{2}\b/g) || [];
@@ -375,12 +379,20 @@ export async function gatherSources(question, {history = [], language = 'en', de
   const raw = await deps.complete({user: planPrompt(resolveFollowUp(question, history), history, today, language), grammar: PLAN_GRAMMAR, maxTokens: 160});
   const resolved = resolveFollowUp(question, history);
   const plan = parsePlan(raw, resolved);
-  // The resolved question is always searched too, in case the plan lost the subject.
-  if (resolved !== question.trim() && !plan.queries.some(q => q.toLowerCase() === resolved.toLowerCase())) plan.queries = [...plan.queries.slice(0, 2), resolved.replace(' — ', ' ').slice(0, 200)];
+  // Follow-up: the first query (also used for Wikipedia) always carries the
+  // inherited subject, in case the model's plan lost it.
+  const followUp = resolved !== question.trim();
+  const subject = followUp ? resolved.split(' — ')[0] : '';
+  if (followUp) {
+    const keywords = s => (s.toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '').match(/[\p{L}\p{N}]+/gu) || []).filter(t => (t.length >= 3 || /^\d+$/.test(t)) && !STOP.has(t));
+    const first = [...new Set(keywords(resolved))].join(' ').slice(0, 200);
+    if (first) plan.queries = [first, ...plan.queries.filter(q => q.toLowerCase() !== first)].slice(0, 3);
+    plan.wiki = [...new Set(keywords(subject))].join(' ').slice(0, 200) || first;
+  }
   onStep('search', plan);
   const wiki = deps.wikipedia ? [
-    deps.wikipedia(plan.queries[0], 'en').catch(() => []),
-    ...(language !== 'en' ? [deps.wikipedia(plan.queries[1] || plan.queries[0], language).catch(() => [])] : [])
+    deps.wikipedia(plan.wiki || plan.queries[0], 'en').catch(() => []),
+    ...(language !== 'en' ? [deps.wikipedia(plan.wiki || plan.queries[1] || plan.queries[0], language).catch(() => [])] : [])
   ] : [];
   const [wikiLists, lists] = await Promise.all([Promise.all(wiki), Promise.all(plan.queries.map(q => deps.search(q).catch(() => [])))]);
   // Top Wikipedia article per language first, then interleaved web results.
@@ -414,7 +426,7 @@ export async function gatherSources(question, {history = [], language = 'en', de
     if (fresh.length >= 2) usable = [...fresh, ...usable.filter(p => !fresh.includes(p))];
   }
   const chunks = usable.slice(0, maxPages + 2).flatMap(p => chunkText(p.text).map(text => ({title: p.title, url: p.url, date: p.date, prior: p.prior, text})));
-  const ranked = rankChunks(chunks, [resolved, ...plan.queries].join(' '));
+  const ranked = rankChunks(chunks, [resolved, ...plan.queries].join(' '), {subject});
   const context = selectContext(ranked);
   return {plan, sources: sourcesFromContext(context), today, resolved};
 }
