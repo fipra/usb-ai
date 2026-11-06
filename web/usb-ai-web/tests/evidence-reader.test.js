@@ -52,3 +52,44 @@ test('election outcome questions exclude speculation about the next race',()=>{
  const entry={...entries[0],date:'2026-11-04',description:'With the dust still settling on the USA midterm election results, attention is already turning to the Republicans who might seek to lead the party into the next presidential race. This analysis discusses possible candidates and campaign strategy for the next election.'};
  assert.equal(evidenceCards('USA midterm election results 2026',[entry]).length,0);
 });
+
+// Regression: the user supplied these excerpts. They are test input, not verified election data.
+const userQuestion='chi ha vinto le elezioni negli stati uniti 2026 novembre';
+const source=(description,title='US midterm elections 2026')=>({...report,title,date:'2026-11-06',description:description+'\n'+('Additional article context. '.repeat(9))});
+const control='Trump and Vice-President JD Vance have both blamed the Iran war for Republican losses that allowed Democrats full control of the US House of Representatives and the Senate.';
+const local='In Michigan, El-Sayed won a majority of Jewish voters, according to exit polls.';
+test('national outcome keeps decisive text without repeating election keywords and excludes voter-group majority',()=>{
+ const cards=evidenceCards(userQuestion,[source(local),source(control)]);
+ assert.ok(cards.some(c=>c.quote===control));
+ assert.ok(cards.every(c=>!c.quote.includes('Jewish voters')));
+ const answer=renderEvidenceAnswer('{"evidence":["E99"]}',cards,'it');
+ assert.match(answer,/Democratici.*Camera.*Senato/);
+ assert.match(answer,/\[2\]/);
+ assert.doesNotMatch(answer,/El-Sayed|2026|253/);
+});
+test('best evidence after the first six passages survives the global context budget',()=>{
+ const irrelevant=Array.from({length:5},()=>source(local));
+ const cards=evidenceCards(userQuestion,[...irrelevant,source(control)]);
+ assert.equal(cards[0].source,6);
+ assert.match(renderEvidenceAnswer('{"evidence":[]}',cards,'it'),/\[6\]/);
+});
+test('forecasts, negation, old years and local seat gains do not establish national control',()=>{
+ for(const text of ['Democrats could win control of the House and Senate.', 'Democrats have not won control of the House and Senate.', 'Democrats won control of the House and Senate in 2018.', 'Democrats won three Senate seats in this election.',local]) {
+  const cards=evidenceCards(userQuestion,[source(text)]);
+  assert.equal(cards.length,0,text);
+ }
+});
+test('opposite winners come from source text, and conflicting sources are exposed',()=>{
+ const republican='Republicans won control of the House and Senate in this US election.';
+ const cards=evidenceCards(userQuestion,[source(republican)]);
+ assert.match(renderEvidenceAnswer('{}',cards,'it'),/Repubblicani.*Camera.*Senato/);
+ const conflict=evidenceCards(userQuestion,[source(control),source(republican)]);
+ assert.match(renderEvidenceAnswer('{}',conflict,'it'),/discordanti/);
+});
+test('one chamber does not imply both; local questions are not converted into national questions',()=>{
+ const cards=evidenceCards(userQuestion,[source('Democrats won control of the House in this US election.')]);
+ const answer=renderEvidenceAnswer('{}',cards,'it');
+ assert.match(answer,/Camera/);assert.doesNotMatch(answer,/Senato/);
+ const localCards=evidenceCards('Who won the Michigan election 2026?',[source(local)]);
+ assert.ok(localCards.length);assert.ok(localCards.every(c=>!c.national));
+});
