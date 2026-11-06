@@ -12,7 +12,8 @@ def apply(app, root, replace):
     replace(main, "$('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');", "renderWebSearch(); $('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');")
     replace(main, "  $('semantic-toggle').disabled = value;", "  $('semantic-toggle').disabled = value;\n  $('web-search-toggle').disabled = value;")
     replace(main, "let pendingAnswer = '';", "let pendingAnswer = '';\n  let webRagFound = null, webRagToday = '', webRagContext = '', webRagYears = '';")
-    replace(main, "    if (!isRemote(selectedId)) {\n      setStatus(tr('loading'), false, true);", """    if (webSearchEnabled && !isSmallTalk(text)) {
+    replace(main, "    if (!isRemote(selectedId)) {\n      setStatus(tr('loading'), false, true);", """    // A chat with documents answers from them: never search the web there.
+    if (webSearchEnabled && !isSmallTalk(text) && !chatDocuments.length) {
       if (isRemote(selectedId)) throw Error(tr('webSearchLocalOnly'));
       if (text.length > 600) throw Error(tr('webSearchLong'));
       setStatus(tr('loading'), false, true);
@@ -39,6 +40,8 @@ def apply(app, root, replace):
     }
     if (!isRemote(selectedId)) {
       setStatus(tr('loading'), false, true);""")
+    # Uploading a document switches web search off for the answers that follow.
+    replace(main, "      render();\n      const message = tr('documentReady').replace('{count}', files.length);", "      const webWasOn = webSearchEnabled;\n      webSearchEnabled = false;\n      render();\n      const message = tr('documentReady').replace('{count}', files.length) + (webWasOn ? ' ' + tr('webSearchOffForDocument') : '');")
     # Web answers stream visibly (they are generated without reasoning).
     replace(main, "if (showGenerationThinking) { answer.text = pendingAnswer; streamView?.update(); }", "if (showGenerationThinking || webRagFound) { answer.text = showGenerationThinking ? pendingAnswer : normalizeThinking(pendingAnswer); streamView?.update(); }")
     replace(main, 'else answer.text = normalizeThinking(pendingAnswer);', 'else answer.text = normalizeThinking(pendingAnswer);\n    if (webRagFound && answer.text) answer.text = finalizeAnswer(answer.text, webRagFound, text, language, webRagToday, webRagContext, webRagYears).text;')

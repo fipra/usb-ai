@@ -34,6 +34,7 @@ function renderWebSearch() {
 $('web-search-toggle').onclick = () => {
   if (busy) return;
   if (webSearchEnabled) { webSearchEnabled = false; render(); return; }
+  if (documentsForChat(documents, activeId).length) { setStatus(tr('webSearchBlockedByDocument')); return; }
   $('web-search-dialog').showModal();
   $('web-search-enable').focus();
 };
