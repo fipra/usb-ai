@@ -9,6 +9,18 @@ const LANGUAGE_NAMES = {en:'English', it:'Italian', fr:'French', de:'German', es
 export const languageName = code => LANGUAGE_NAMES[code] || 'English';
 
 // ---------- 1. Query planning ----------
+// Short follow-ups inherit the subject of the conversation, so a small model
+// cannot lose it ("dove ha studiato" after "chi è Giorgia Meloni").
+const NEW_SUBJECT = /^(?:chi è|chi era|cos'è|cosa è|che cos'è|cosa sono|who is|who was|what is|what are|qui est|qu'est-ce|wer ist|was ist|quién es|qué es)(?=\s|$)/i;
+const isFollowUp = text => text.split(/\s+/).filter(Boolean).length <= 6 && !NEW_SUBJECT.test(text.trim());
+export function resolveFollowUp(question, history = []) {
+  const users = history.filter(m => m && m.role === 'user' && typeof m.text === 'string' && m.text.trim() && !isSmallTalk(m.text)).map(m => m.text.trim());
+  let root = '';
+  for (const text of users) root = root && isFollowUp(text) ? root : text;
+  const current = question.trim();
+  return root && isFollowUp(current) ? `${root.slice(0, 200)} — ${current}` : current;
+}
+
 // The model rewrites the conversation into self-contained search queries.
 // A grammar keeps even a 1B model on valid JSON.
 export const PLAN_GRAMMAR = String.raw`root ::= "{\"queries\":[" q ("," q){0,2} "],\"recent\":" ("true" | "false") "}"
@@ -251,7 +263,7 @@ const normNumber = n => n.replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.');
 
 // Checks citations and that every number in a cited sentence appears in a cited
 // source (or in the question). Generic: no topic-specific rules.
-export function verifyAnswer(answer, sources, question = '', today = '') {
+export function verifyAnswer(answer, sources, question = '', today = '', context = '') {
   const valid = new Set(sources.map(s => s.source));
   const sentences = String(answer).split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(Boolean);
   const invalidCitations = new Set();
@@ -273,20 +285,34 @@ export function verifyAnswer(answer, sources, question = '', today = '') {
     const sourceNumbers = new Set((haystack.match(NUMBER) || []).map(normNumber));
     for (const n of numbers) if (!sourceNumbers.has(n) && !sourceNumbers.has(n.replace(/\.0+$/, ''))) unsupported.push(n);
   }
+  // Proper names (capitalised words inside a sentence) must appear in the
+  // sources, the question or the user's earlier messages.
+  const known = (sources.map(s => s.title + ' ' + (s.url || '') + ' ' + s.text).join(' ') + ' ' + question + ' ' + context).toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '');
+  const names = [];
+  for (const sentence of sentences) {
+    const words = sentence.replace(/\[\d{1,2}\]/g, '').split(/\s+/).slice(1);
+    for (const raw of words) {
+      const word = raw.split(/['’]/).pop().replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
+      if (!/^\p{Lu}[\p{L}-]{3,}$/u.test(word) || /^\p{Lu}+$/u.test(word)) continue;
+      const key = word.toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '');
+      if (!known.includes(key) && !names.includes(word)) names.push(word);
+    }
+  }
   return {
     invalidCitations: [...invalidCitations],
     unsupportedNumbers: [...new Set(unsupported)],
+    unsupportedNames: names,
     citationRate: factual ? cited / factual : 0,
-    ok: invalidCitations.size === 0 && unsupported.length === 0 && cited > 0
+    ok: invalidCitations.size === 0 && unsupported.length === 0 && names.length === 0
   };
 }
 
 const WARN = {
-  en: ['Check:', 'these numbers do not appear in the cited sources', 'the answer has no source citations'],
-  it: ['Verifica:', 'questi numeri non compaiono nelle fonti citate', 'la risposta non cita le fonti'],
-  fr: ['Vérification :', 'ces nombres n’apparaissent pas dans les sources citées', 'la réponse ne cite aucune source'],
-  de: ['Prüfung:', 'diese Zahlen stehen nicht in den zitierten Quellen', 'die Antwort nennt keine Quellen'],
-  es: ['Verificación:', 'estos números no aparecen en las fuentes citadas', 'la respuesta no cita fuentes']
+  en: ['To check:', 'these numbers are not in the sources', 'these names are not in the sources'],
+  it: ['Da verificare:', 'questi numeri non sono nelle fonti', 'questi nomi non sono nelle fonti'],
+  fr: ['À vérifier :', 'ces nombres ne figurent pas dans les sources', 'ces noms ne figurent pas dans les sources'],
+  de: ['Bitte prüfen:', 'diese Zahlen stehen nicht in den Quellen', 'diese Namen stehen nicht in den Quellen'],
+  es: ['Por verificar:', 'estos números no están en las fuentes', 'estos nombres no están en las fuentes']
 };
 // Removes citations to non-existent sources and appends a short warning.
 // Links not belonging to a source page are removed (with their line).
@@ -298,14 +324,14 @@ export function removeInventedLinks(text, sources) {
   }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-export function finalizeAnswer(answer, sources, question = '', language = 'en', today = '') {
+export function finalizeAnswer(answer, sources, question = '', language = 'en', today = '', context = '') {
   let text = removeInventedLinks(String(answer).trim(), sources);
-  const check = verifyAnswer(text, sources, question, today);
+  const check = verifyAnswer(text, sources, question, today, context);
   for (const r of check.invalidCitations) text = text.replaceAll(`[${r}]`, '');
   const w = WARN[language] || WARN.en;
   const notes = [];
   if (check.unsupportedNumbers.length) notes.push(`${w[1]}: ${check.unsupportedNumbers.slice(0, 6).join(', ')}`);
-  if (!/\[\d{1,2}\]/.test(text)) notes.push(w[2]);
+  if (check.unsupportedNames.length) notes.push(`${w[2]}: ${check.unsupportedNames.slice(0, 6).join(', ')}`);
   if (notes.length) text += `\n\n> ⚠️ ${w[0]} ${notes.join('; ')}.`;
   return {text, check};
 }
@@ -339,8 +365,11 @@ export async function gatherSources(question, {history = [], language = 'en', de
   const now = deps.now || new Date();
   const today = now.toISOString().slice(0, 10);
   onStep('plan');
-  const raw = await deps.complete({user: planPrompt(question, history, today, language), grammar: PLAN_GRAMMAR, maxTokens: 160});
-  const plan = parsePlan(raw, question);
+  const raw = await deps.complete({user: planPrompt(resolveFollowUp(question, history), history, today, language), grammar: PLAN_GRAMMAR, maxTokens: 160});
+  const resolved = resolveFollowUp(question, history);
+  const plan = parsePlan(raw, resolved);
+  // The resolved question is always searched too, in case the plan lost the subject.
+  if (resolved !== question.trim() && !plan.queries.some(q => q.toLowerCase() === resolved.toLowerCase())) plan.queries = [...plan.queries.slice(0, 2), resolved.replace(' — ', ' ').slice(0, 200)];
   onStep('search', plan);
   const wiki = deps.wikipedia ? [
     deps.wikipedia(plan.queries[0], 'en').catch(() => []),
@@ -378,9 +407,9 @@ export async function gatherSources(question, {history = [], language = 'en', de
     if (fresh.length >= 2) usable = [...fresh, ...usable.filter(p => !fresh.includes(p))];
   }
   const chunks = usable.slice(0, maxPages + 2).flatMap(p => chunkText(p.text).map(text => ({title: p.title, url: p.url, date: p.date, prior: p.prior, text})));
-  const ranked = rankChunks(chunks, [question, ...plan.queries].join(' '));
+  const ranked = rankChunks(chunks, [resolved, ...plan.queries].join(' '));
   const context = selectContext(ranked);
-  return {plan, sources: sourcesFromContext(context), today};
+  return {plan, sources: sourcesFromContext(context), today, resolved};
 }
 
 export async function research(question, options) {
@@ -389,6 +418,6 @@ export async function research(question, options) {
   if (!sources.length) return {plan, sources, answer: '', check: null, empty: true};
   onStep('answer', sources.length);
   const answer = await deps.complete({messages: answerMessages(question, sources, today, language, options.history || []), maxTokens: 700});
-  const final = finalizeAnswer(answer, sources, question, language, today);
+  const final = finalizeAnswer(answer, sources, question, language, today, (options.history || []).filter(m => m.role === 'user').map(m => m.text).join(' '));
   return {plan, sources, answer: final.text, raw: answer, check: final.check};
 }

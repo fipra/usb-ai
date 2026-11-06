@@ -40,11 +40,11 @@ test('chunks stay bounded', () => {
 
 test('verification flags invented numbers and invalid citations', () => {
   const sources = [{source: 1, text: 'The Matterhorn is 4,478 metres high.'}];
-  assert.equal(verifyAnswer('Il Cervino è alto 4.478 metri [1].', sources, '').ok, true);
+  assert.equal(verifyAnswer('Il Cervino è alto 4.478 metri [1].', sources, 'Quanto è alto il Cervino?').ok, true);
   const bad = finalizeAnswer('Il Cervino è alto 4.810 metri [1][5].', sources, '', 'it');
   assert.match(bad.text, /4810/);
   assert.doesNotMatch(bad.text, /\[5\]/);
-  assert.match(finalizeAnswer('Il Cervino è alto.', sources, '', 'it').text, /non cita/);
+  assert.doesNotMatch(finalizeAnswer('Il Cervino è alto.', sources, 'Quanto è alto il Cervino?', 'it').text, /⚠️/);
 });
 
 test('Wikipedia results become article and lightweight render URLs', () => {
@@ -91,4 +91,17 @@ test('ages computed from source years are accepted; invented links are removed',
   assert.doesNotMatch(links.text, /camcom|2003/);
   assert.match(links.text, /wikipedia/);
   assert.doesNotMatch(links.text, /⚠️/);
+});
+
+test('follow-ups inherit the subject; invented names are flagged', async () => {
+  const { resolveFollowUp, finalizeAnswer } = await import('../web-rag.js');
+  const history = [{role: 'user', text: 'chi è giorgia meloni'}, {role: 'assistant', text: 'x'}, {role: 'user', text: 'quanti anni ha'}, {role: 'assistant', text: 'y'}, {role: 'user', text: 'grazie'}];
+  assert.equal(resolveFollowUp('dove ha studiato', history), 'chi è giorgia meloni — dove ha studiato');
+  assert.equal(resolveFollowUp('Chi ha vinto Wimbledon 2025 nel singolare maschile?', history), 'Chi ha vinto Wimbledon 2025 nel singolare maschile?');
+  assert.equal(resolveFollowUp('chi è Mario Draghi', history), 'chi è Mario Draghi');
+  const sources = [{source: 1, title: 'Giorgia Meloni', url: 'https://it.wikipedia.org/wiki/Giorgia_Meloni', text: 'Giorgia Meloni si è diplomata all\'Istituto Amerigo Vespucci di Roma.'}];
+  const bad = finalizeAnswer('Giorgia Meloni ha studiato all\'Università di Firenze, Giurisprudenza.', sources, 'dove ha studiato', 'it', '2026-11-06', 'chi è giorgia meloni');
+  assert.match(bad.text, /nomi non sono nelle fonti: Università, Firenze, Giurisprudenza/);
+  const good = finalizeAnswer('Si è diplomata all\'Istituto Amerigo Vespucci di Roma [1].', sources, 'dove ha studiato', 'it', '2026-11-06');
+  assert.doesNotMatch(good.text, /⚠️/);
 });
