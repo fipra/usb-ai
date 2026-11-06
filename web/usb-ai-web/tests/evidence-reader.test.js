@@ -93,3 +93,18 @@ test('one chamber does not imply both; local questions are not converted into na
  const localCards=evidenceCards('Who won the Michigan election 2026?',[source(local)]);
  assert.ok(localCards.length);assert.ok(localCards.every(c=>!c.national));
 });
+
+test('a percentage follow-up carries context into evidence selection, not the previous winner summary',async()=>{
+ const {webSearchQuery}=await import('../web-search.js');
+ const {evidenceMissing}=await import('../evidence-reader.js');
+ const resolved=webSearchQuery('mi si cercare le percentuali??',[{role:'user',text:userQuestion}]);
+ const percent='In this fictional US election, the Orange party won 52.4% of the national vote, with counting still incomplete.';
+ const poll='A poll found 56% of voters said data centres were a crucial factor in their vote.';
+ const cards=evidenceCards(resolved,[source(control),source(poll),source(percent)]);
+ assert.equal(cards.length,1);assert.equal(cards[0].quote,percent);assert.equal(cards[0].national,false);
+ assert.match(evidencePrompt(resolved,cards),/2026 novembre.*percentuali/);
+ const answer=renderEvidenceAnswer('{"evidence":["E1"]}',cards,'it');
+ assert.match(answer,/52.4%/);assert.match(answer,/incomplete/);assert.doesNotMatch(answer,/controllo della Camera|56%/);
+ assert.equal(evidenceCards(resolved,[source(control),source(poll)]).length,0);
+ assert.match(evidenceMissing(resolved,'it'),/percentuali pertinenti/);
+});
