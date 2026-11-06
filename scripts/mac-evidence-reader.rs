@@ -1,26 +1,62 @@
+fn public_evidence_ip(ip: [u8; 4]) -> bool {
+    let [a, b, _, _] = ip;
+    !(a == 0
+        || a == 10
+        || a == 127
+        || a >= 224
+        || a == 169 && b == 254
+        || a == 172 && (16..=31).contains(&b)
+        || a == 192 && [168, 0, 2].contains(&b)
+        || a == 100 && (64..=127).contains(&b)
+        || a == 198 && [18, 19, 51].contains(&b)
+        || a == 203 && b == 0)
+}
 fn read_evidence_article(data: &Value) -> Result<Vec<u8>, String> {
     let url = data["url"].as_str().ok_or("Missing URL")?;
-    let hosts = [
-        "www.bbc.com",
-        "www.bbc.co.uk",
-        "www.theguardian.com",
-        "www.ansa.it",
-        "tg24.sky.it",
-        "www.vaticannews.va",
-        "www.ilpost.it",
-        "apnews.com",
-        "www.reuters.com",
-    ];
+    use std::net::{IpAddr, ToSocketAddrs};
     if url.len() > 2000
         || url
             .chars()
             .any(|c| c.is_control() || c.is_whitespace() || c == '\\')
-        || !hosts
-            .iter()
-            .any(|host| url.starts_with(&format!("https://{host}/")))
     {
         return Err("Invalid publisher URL".into());
     }
+    let host = url
+        .strip_prefix("https://")
+        .and_then(|v| v.split('/').next())
+        .ok_or("Invalid publisher URL")?;
+    if !host.contains('.')
+        || host.parse::<IpAddr>().is_ok()
+        || !host
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'.' || c == b'-')
+        || [
+            ".local",
+            ".localhost",
+            ".internal",
+            ".test",
+            ".invalid",
+            ".example",
+            ".home",
+            ".lan",
+        ]
+        .iter()
+        .any(|suffix| host.ends_with(suffix))
+    {
+        return Err("Invalid publisher URL".into());
+    }
+    let addresses: Vec<_> = (host, 443)
+        .to_socket_addrs()
+        .map_err(|_| "Publisher DNS unavailable")?
+        .filter_map(|s| match s.ip() {
+            IpAddr::V4(ip) => Some(ip),
+            _ => None,
+        })
+        .collect();
+    if addresses.is_empty() || addresses.iter().any(|ip| !public_evidence_ip(ip.octets())) {
+        return Err("Invalid publisher address".into());
+    }
+    let pinned = format!("{host}:443:{}", addresses[0]);
     let output = Command::new("curl")
         .args([
             "--silent",
@@ -34,6 +70,8 @@ fn read_evidence_article(data: &Value) -> Result<Vec<u8>, String> {
             "1048576",
             "--noproxy",
             "*",
+            "--resolve",
+            &pinned,
             url,
         ])
         .output()
