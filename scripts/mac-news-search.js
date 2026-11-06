@@ -48,7 +48,7 @@ async function searchNewsOnce(query, language, signal) {
         const url = item.querySelector('link')?.textContent || '';
         const date = item.querySelector('pubDate')?.textContent || '';
         const summary = (item.querySelector('description')?.textContent || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        if (title && summary) entries.push({title, url, description:`RSS summary; published ${date}: ${summary}`});
+        if (title && summary) entries.push({title, url, date, description:`RSS summary; published ${date}: ${summary}`});
       }
     }
   }

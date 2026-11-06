@@ -41,3 +41,9 @@ test('bounded follow-up searches for missing evidence and deduplicates articles'
  const results=await researchArticles('risultati elezioni stati uniti 2026','it',undefined,async q=>{queries.push(q);return queries.length===1?[]:entries});
  assert.equal(queries.length,2);assert.match(queries[1],/election/);assert.equal(results.length,1);
 });
+
+test('publication date supplies year context; historical passages remain excluded',()=>{
+ const article={...entries[0],date:'2026-11-04',description:entries[0].description.replaceAll('2026','this year')+'\nThe Orange party won the USA election in 2018 with an unusually large majority according to the test commission.'};
+ const cards=evidenceCards('USA election 2026',[article]);
+ assert.ok(cards.length);assert.ok(cards.every(c=>!c.quote.includes('2018')));
+});

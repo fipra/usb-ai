@@ -15,11 +15,11 @@ export function evidenceCards(question, entries) {
   const cards = [];
   entries.forEach((entry, source) => {
     if (entry.kind !== 'article' || !entry.description || entry.description.length < 200) return;
-    const text = normalize(entry.title + ' ' + entry.description);
+    const text = normalize(entry.title + ' ' + entry.description + ' ' + (entry.date || ''));
     if (years.length && !years.some(y => text.includes(y))) return;
     const matches = terms.filter(t => text.includes(t)).length;
     if (matches < Math.min(2, terms.length) || !terms.length) return;
-    const passages = entry.description.split(/\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ý])/u).filter(p => p.length >= 70 && p.length <= 1100);
+    const passages = entry.description.split(/\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ý])/u).filter(p => p.length >= 70 && p.length <= 1100).filter(p => { const mentioned = p.match(/\b20\d{2}\b/g) || []; return !years.length || !mentioned.length || mentioned.some(y => years.includes(y)); });
     passages.map((quote, order) => ({quote,order,score:terms.filter(t => normalize(quote).includes(t)).length})).filter(p => p.score > 0).sort((a,b)=>b.score-a.score || a.order-b.order).slice(0,2).forEach(p => cards.push({id:`E${cards.length+1}`,source:source+1,quote:p.quote,title:entry.title,url:entry.url,date:entry.date || ''}));
   });
   return cards.slice(0,6);
@@ -47,8 +47,11 @@ export async function readCandidates(entries, endpoint, signal) {
       const response = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:entry.url}),signal});
       if (!response.ok) return null;
       const payload = await response.json();
-      const description = extractArticle(payload.html || '');
-      return description.length >= 200 ? {...entry,description,kind:'article'} : null;
+      const html = payload.html || '';
+      const description = extractArticle(html);
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const published = doc.querySelector('meta[property="article:published_time"],meta[name="date"]')?.getAttribute('content') || entry.date || '';
+      return description.length >= 200 ? {...entry,description,date:published,kind:'article'} : null;
     } catch (error) { if (signal?.aborted) throw error; return null; }
   }))).filter(Boolean);
 }
