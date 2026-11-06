@@ -1,4 +1,14 @@
-import { prepareWebResults } from './web-search.js';
+export function prepareNewsResults(results) {
+  const clean = value => value.replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return results.flatMap(result => {
+    if (!result || typeof result.title !== 'string' || typeof result.url !== 'string' || typeof result.description !== 'string') return [];
+    let url;
+    try { url = new URL(result.url); } catch { return []; }
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return [];
+    const title = clean(result.title).slice(0, 150), description = clean(result.description).slice(0, 1800);
+    return title && description ? [{title, url:url.href, description}] : [];
+  }).slice(0, 3);
+}
 export function newsQuestion(question, results) {
   const date = new Date().toLocaleDateString('en-CA');
   const passages = results.map((result, index) => `[${index + 1}] ${result.title}\n${result.description}`).join('\n\n');
@@ -33,12 +43,12 @@ export async function searchGoogleNews(query, language, signal) {
     }
   }
   const stop = new Set(['delle','della','degli','dello','dalla','sono','quale','cerca','risultati','notizie','the','and','what','when','news','results','from','with','about','this','that','pour','dans','avec','para','las','los','como','oder','die','der','und']);
-  const terms = [...new Set((query.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || []).filter(x => !stop.has(x)))];
+  const terms = [...new Set((query.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || []).filter(x => !stop.has(x) && !/^\d{4}$/.test(x)))];
   const score = entry => {
-    const text = (entry.title + ' ' + entry.description).toLowerCase();
+    const text = (entry.title + ' ' + entry.description.split(': ').slice(1).join(': ')).toLowerCase();
     return terms.reduce((n, term) => n + (text.includes(term) ? 1 : 0), 0);
   };
-  const ranked = entries.map((entry, i) => ({entry, i, score:score(entry)})).sort((a,b) => b.score-a.score || a.i-b.i);
+  const ranked = entries.map((entry, i) => ({entry, i, score:score(entry)})).sort((a,b) => b.score-a.score || Number(b.entry.description.startsWith('RSS summary;')) - Number(a.entry.description.startsWith('RSS summary;')) || a.i-b.i);
   const selected = ranked.filter(x => !terms.length || x.score > 0).map(x => x.entry);
-  return prepareWebResults(selected);
+  return prepareNewsResults(selected);
 }
