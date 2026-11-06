@@ -134,3 +134,19 @@ test('article reader limits concurrency, reuses fresh content and honors cancell
   const controller=new AbortController();controller.abort();await assert.rejects(readCandidates(entries,'/test-reader',controller.signal));assert.equal(calls,6);
  }finally{globalThis.fetch=previousFetch;globalThis.DOMParser=previousParser;}
 });
+
+test('open-web URLs allow new publishers but resolved private networks remain blocked',async()=>{
+ const {resolvePublic,publicIPv4}=await import('../../../api/read-article.mjs');
+ assert.equal(allowedArticle('https://www.timesofisrael.com/news/'),true);
+ for(const ip of ['127.0.0.1','10.1.2.3','169.254.169.254','172.16.0.1','192.168.1.1','100.64.0.1','198.18.1.1','0.0.0.0','224.0.0.1','::1'])assert.equal(publicIPv4(ip),false,ip);
+ assert.equal(await resolvePublic('https://www.timesofisrael.com/news/',async()=>[{address:'8.8.8.8'}]),'8.8.8.8');
+ await assert.rejects(resolvePublic('https://public-site.org/a',async()=>[{address:'8.8.8.8'},{address:'10.0.0.1'}]));
+});
+test('Israel question retains English article evidence and has a general fallback search',async()=>{
+ const {newsMatchScore}=await import('../news-search.js');const {researchArticles}=await import('../evidence-reader.js');
+ const q='notizie sulle elezioni in israele';
+ const entry={kind:'article',title:'Israel election news',url:'https://www.timesofisrael.com/article',description:'The election in Israel was discussed in parliament today. This is synthetic fixture text for testing retrieval, not a report about real events. '+ 'Additional fixture context. '.repeat(5)};
+ assert.ok(newsMatchScore(q,entry)>0);assert.ok(evidenceCards(q,[entry]).length);
+ const queries=[];await researchArticles(q,'it',undefined,async query=>{queries.push(query);return queries.length===1?[]:[entry]});
+ assert.equal(queries.length,2);assert.match(queries[1],/Israel/);
+});
