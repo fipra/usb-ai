@@ -60,7 +60,7 @@ async function searchNewsOnce(query, language, signal, fresh=false) {
   const recent = entries.filter(e=>historicalNewsQuery(query) || (!(e.publisher || e.description.startsWith('RSS summary;')) || isRecentNewsDate(e.date)));
   const resolved = await discoverPublisherArticles(recent.filter(e=>e.publisher), '/read-article', signal);
   recent.unshift(...resolved);
-  const ranked = recent.map((entry, i) => ({entry, i, score:newsMatchScore(query, entry)})).sort((a,b) => b.score-a.score || Number(b.entry.description.startsWith('RSS summary;')) - Number(a.entry.description.startsWith('RSS summary;')) || a.i-b.i);
+  const ranked = recent.map((entry, i) => ({entry, i, score:newsMatchScore(query, entry)})).sort((a,b) => Number(!!b.entry.publisherResolved)-Number(!!a.entry.publisherResolved) || b.score-a.score || Number(b.entry.description.startsWith('RSS summary;')) - Number(a.entry.description.startsWith('RSS summary;')) || a.i-b.i);
   const selected = ranked.filter(x => (x.score > 0 || x.entry.discovered) && !x.entry.url.includes('news.google.com')).map(x => x.entry);
   const articles = await readCandidates(selected, '/read-article', signal);
   return fresh ? articles.filter(entry=>isRecentNewsDate(entry.date)) : articles;
