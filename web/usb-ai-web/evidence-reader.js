@@ -1,5 +1,23 @@
 // Shared by browser and native experiments. Documents remain untrusted data.
-export const READER_VERSION = 'evidence-reader-3.1';
+export const READER_VERSION = 'evidence-reader-3.2';
+export const NEWS_MAX_AGE_MS = 72 * 60 * 60 * 1000;
+export function historicalNewsQuery(query, now=Date.now()) {
+  const year=new Date(now).getFullYear();
+  const years=query.match(/\b(?:19|20)\d{2}\b/g)||[];
+  return years.length>0 && years.every(value=>Number(value)<year);
+}
+export function requiresFreshNews(query, now=Date.now()) {
+  return !historicalNewsQuery(query,now) && /notizi|\bnews\b|oggi|latest|recent|attual|aggiornament|ultim|heute|aktuell|actualité|nouvelles|nachrichten|noticias|hoy/i.test(query);
+}
+export function isRecentNewsDate(value, now=Date.now()) {
+  if(typeof value!=='string'||!value.trim())return false;
+  const time=Date.parse(value);
+  return Number.isFinite(time)&&time<=now+5*60*1000&&time>=now-NEWS_MAX_AGE_MS;
+}
+export function sourceDateLabel(value, language='en') {
+  const date=Date.parse(value||'');
+  return Number.isFinite(date)?new Date(date).toLocaleString(['en','it','fr','de','es'].includes(language)?language:'en',{dateStyle:'medium',timeStyle:'short'}):'';
+}
 export function extractArticle(html) {
   const doc = new DOMParser().parseFromString(html.slice(0, 1048576), 'text/html');
   for (const element of doc.querySelectorAll('script,style,nav,header,footer,aside,form,iframe,noscript')) element.remove();
@@ -20,6 +38,7 @@ export function evidenceMissing(question, language='en') {
     es:'La búsqueda tiene en cuenta el contexto, pero los artículos leídos no aportan porcentajes pertinentes. Los escaños y las encuestas de grupos no permiten deducir porcentajes de voto.'
   };
   if(percentageQuestion(question))return messages[language]||messages.en;
+  if(requiresFreshNews(question))return ({en:'I could not retrieve relevant article text published in the last 72 hours. Older or undated sources were excluded.',it:'Non ho recuperato testi pertinenti pubblicati nelle ultime 72 ore. Ho escluso fonti vecchie o senza una data valida.',fr:'Aucun texte pertinent publié durant les dernières 72 heures n’a pu être récupéré. Les sources anciennes ou sans date valide ont été exclues.',de:'Keine relevanten Artikeltexte aus den letzten 72 Stunden abrufbar. Ältere Quellen und Quellen ohne gültiges Datum wurden ausgeschlossen.',es:'No pude recuperar textos pertinentes publicados en las últimas 72 horas. Se excluyeron fuentes antiguas o sin fecha válida.'})[language] || 'No relevant article text published in the last 72 hours was retrieved.';
   return ({en:'No usable article text was retrieved. This does not mean there is no news on this topic.',it:'Non ho recuperato testi utilizzabili. Questo non significa che non esistano notizie sul tema.',fr:'Aucun article pertinent n’a pu être lu.',de:'Keine passenden Artikel lesbar.',es:'No se pudieron leer artículos pertinentes.'})[language]||'No usable article text was retrieved. This does not mean there is no news on this topic.';
 }
 export function nationalOutcomeQuestion(question) {
@@ -212,7 +231,7 @@ export async function researchArticles(query, language, signal, search) {
   // Remove request boilerplate before search; retain the original question for evidence.
   const compact=query.replace(/\b(?:notizie|news|cerca|sulle|sugli|sulla|sul)\b/gi,' ').replace(/\s+/g,' ').trim();
   const initial=compact || query;
-  const first = await search(initial, language, signal);
+  const first = await search(initial, language, signal, requiresFreshNews(query));
   const cards = evidenceCards(query, first);
   const text = cards.map(c=>c.quote).join(' ').toLowerCase();
   let missing = '';
@@ -228,7 +247,7 @@ export async function researchArticles(query, language, signal, search) {
   const followup = (alternate + missing).trim().slice(0,600);
   if (followup === query.trim()) return first;
   try {
-    const second = await search(followup, language, signal);
+    const second = await search(followup, language, signal, requiresFreshNews(query));
     const unique = new Map([...first,...second].map(entry=>[entry.url,entry]));
     const merged=[...unique.values()];
     // A second search must be able to replace an irrelevant first batch.
