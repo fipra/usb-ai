@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
     (work / 'node_modules').symlink_to(web / 'node_modules', target_is_directory=True)
     app = work / 'usb-ai-web'
     main = app / 'main.js'
-    replace(main, "import './style.css';", "import './style.css';\nimport { webSearchQuery } from './web-search.js';\nimport { searchGoogleNews, newsQuestion, prepareNewsResults } from './news-search.js';")
+    replace(main, "import './style.css';", "import './style.css';\nimport { evidenceCards, evidencePrompt, renderEvidenceAnswer } from './evidence-reader.js';\nimport { webSearchQuery } from './web-search.js';\nimport { searchGoogleNews, newsQuestion, prepareNewsResults } from './news-search.js';")
     replace(main, 'let thinking = false, semanticEnabled = false;', 'let thinking = false, semanticEnabled = false;\nlet webSearchEnabled = false;')
     replace(main, "$('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');", "renderWebSearch(); $('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');")
     replace(main, "  $('semantic-toggle').disabled = value;", "  $('semantic-toggle').disabled = value;\n  $('web-search-toggle').disabled = value;")
@@ -36,13 +36,18 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
       catch (error) { if (controller.signal.aborted) throw error; throw Error(error.message === 'WEB_SEARCH_LIMIT' ? tr('webSearchLimit') : tr('webSearchError')); }
       if (!entries.length) throw Error(tr('webSearchEmpty'));
       answer.webSources = entries;
+      answer.evidenceCards = evidenceCards(text, entries);
+      if (!answer.evidenceCards.length) throw Error(tr('webSearchEmpty'));
+      answer.webSources = entries.map((entry, i) => ({...entry, description:answer.evidenceCards.filter(c => c.source === i+1).map(c => c.quote).join('\\n')}));
       for (const context of contexts) {
-        const last = context.at(-1);
-        last.content = newsQuestion(last.content, entries);
+        // Evidence selection is independent of unrelated chat history.
+        context.splice(0, context.length, {role:'user', content:evidencePrompt(text, answer.evidenceCards)});
       }
     }
     if (!isRemote(selectedId)) {
       setStatus(tr('loading'), false, true);""")
+    replace(main, 'else answer.text = normalizeThinking(pendingAnswer);', 'else answer.text = answer.evidenceCards ? renderEvidenceAnswer(normalizeThinking(pendingAnswer), answer.evidenceCards, language) : normalizeThinking(pendingAnswer);')
+    replace(main, 'const showGenerationThinking = thinking;', 'const showGenerationThinking = thinking && !webSearchEnabled;')
     replace(main, "if (message.text) content.append(messageActions(chat, message));", """if (message.webSources?.length) {
   const details = node('details', undefined, 'source');
   details.append(node('summary', `${tr('webSearchSources')} (${message.webSources.length})`));
@@ -61,6 +66,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
     with (app / 'i18n.js').open('a') as out:
         out.write('\n' + (root / 'scripts' / 'web-search-strings.js').read_text())
         out.write('\n' + (root / 'scripts' / 'web-news-strings.js').read_text())
+        out.write('\n' + (root / 'scripts' / 'evidence-reader-strings.js').read_text())
     env = dict(os.environ, USB_AI_WEB_BASE='/notizie-web/')
     subprocess.run(['npm', 'run', 'build'], cwd=work, env=env, check=True)
     shutil.copytree(work / 'dist', root / '.vercel-static' / 'notizie-web', dirs_exist_ok=True)
