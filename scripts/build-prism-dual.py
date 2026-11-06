@@ -25,13 +25,7 @@ QWEN25_ENTRY = """export const CATALOG = [{
   source:'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF',
   sha256:'74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db', license:'Apache-2.0'
 }];"""
-# Default model of /nuovo-ricerca/ (pinned revision, size and SHA-256 from Hugging Face).
-ARTEMIS_ENTRY = """export const CATALOG = [{
-  id:'qwen3.5-0.8b-artemis-q4', name:'Qwen3.5 · 0.8B Artemis Q4_K_M', size:532402496,
-  url:'https://huggingface.co/turintech/Qwen3.5-0.8B-Artemis-GGUF/resolve/07d01f4016c2e0ec614b3b04cfce1820a116d2dc/Qwen3.5-0.8B-Artemis-Q4_K_M.gguf',
-  source:'https://huggingface.co/turintech/Qwen3.5-0.8B-Artemis-GGUF',
-  sha256:'01e0651f0fc5d0f9a3d1a68166fbdf12ab4d3bb135b3d725d694f42becfaa5a4', license:'Apache-2.0'
-}];"""
+# /nuovo-ricerca/ keeps the standard catalog: Llama 3.2 1B Q4_K_M (pinned in catalog.js).
 dest = root / '.vercel-static' / base_path.strip('/')
 
 def replace_file(path, old, new):
@@ -63,8 +57,8 @@ with tempfile.TemporaryDirectory(prefix='llamanest-prism-gpu-') as tmp:
         text = catalog.read_text()
         start = text.index('export const CATALOG = [')
         end = text.index('];', start) + 2
-        starter_entry = ARTEMIS_ENTRY if web_rag else QWEN25_ENTRY
-        catalog.write_text(text[:start] + starter_entry + text[end:])
+        if not web_rag:
+            catalog.write_text(text[:start] + QWEN25_ENTRY + text[end:])
     runtime = app / 'runtime.js'
     replace_file(runtime, 'wasm/wllama.wasm', 'wasm/standard-wllama.wasm')
     replace_file(runtime, "let engine;", "let engineMode = 'prism';\nexport function setEngineMode(value) { if (!['prism','standard'].includes(value)) throw Error('Invalid engine'); engineMode = value; }\nlet engine;")
@@ -97,7 +91,8 @@ with tempfile.TemporaryDirectory(prefix='llamanest-prism-gpu-') as tmp:
         replace_file(main, "import './style.css';", "import './style.css';\nimport { engineForModel } from './engine-routing.js';")
         replace_file(main, "let webEngine = 'prism';", "let webEngine = 'standard';")
         replace_file(main, "settings?.webEngine === 'standard' ? 'standard' : 'prism'", "settings?.webEngine === 'prism' ? 'prism' : 'standard'")
-        replace_file(main, "Llama-3.2-1B-Instruct-Q4_K_M.gguf", "Qwen3.5-0.8B-Artemis-Q4_K_M.gguf" if web_rag else "qwen2.5-0.5b-instruct-q4_k_m.gguf")
+        if not web_rag:
+            replace_file(main, "Llama-3.2-1B-Instruct-Q4_K_M.gguf", "qwen2.5-0.5b-instruct-q4_k_m.gguf")
         replace_file(main, "  let loaded = false;\n  try {\n    await loadModel(id, contextSize, cpuThreads, isWindows() ? windowsBackend : 'auto');", """  let loaded = false;
   const previousEngine = webEngine;
   try {
@@ -156,7 +151,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-prism-gpu-') as tmp:
             out.write("\nconst expStrings={en:{welcomePresetLabel:'Welcome message',starterHint:'Qwen 2.5 0.5B is loading locally. Write your first message to see the introduction.',safariStarterHint:'Qwen 2.5 0.5B is loading locally. Write your first message to see the introduction.'},it:{welcomePresetLabel:'Messaggio di benvenuto',starterHint:'Qwen 2.5 0,5B si prepara in locale. Scrivi il primo messaggio per leggere il benvenuto.',safariStarterHint:'Qwen 2.5 0,5B si prepara in locale. Scrivi il primo messaggio per leggere il benvenuto.'},fr:{welcomePresetLabel:'Message de bienvenue',starterHint:'Qwen 2.5 0,5B se prépare localement. Écrivez votre premier message pour voir l’accueil.',safariStarterHint:'Qwen 2.5 0,5B se prépare localement. Écrivez votre premier message pour voir l’accueil.'},de:{welcomePresetLabel:'Willkommensnachricht',starterHint:'Qwen 2.5 0,5B wird lokal vorbereitet. Schreibe deine erste Nachricht für die Begrüßung.',safariStarterHint:'Qwen 2.5 0,5B wird lokal vorbereitet. Schreibe deine erste Nachricht für die Begrüßung.'},es:{welcomePresetLabel:'Mensaje de bienvenida',starterHint:'Qwen 2.5 0,5B se prepara localmente. Escribe tu primer mensaje para ver la bienvenida.',safariStarterHint:'Qwen 2.5 0,5B se prepara localmente. Escribe tu primer mensaje para ver la bienvenida.'}}; for(const lang of Object.keys(expStrings)) Object.assign(translations[lang],expStrings[lang]);\n")
     if web_rag:
         text = translations.read_text()
-        for old, new in (('Qwen 2.5 0.5B (491 MB)', 'Qwen3.5 0.8B Artemis (532 MB)'), ('Qwen 2.5 0,5B (491 MB)', 'Qwen3.5 0,8B Artemis (532 MB)'), ('Qwen 2.5 0,5B (491 Mo)', 'Qwen3.5 0,8B Artemis (532 Mo)'), ('Qwen 2.5 0.5B', 'Qwen3.5 0.8B Artemis'), ('Qwen 2.5 0,5B', 'Qwen3.5 0,8B Artemis')):
+        for old, new in (('Qwen 2.5 0.5B (491 MB)', 'Llama 3.2 1B (808 MB)'), ('Qwen 2.5 0,5B (491 MB)', 'Llama 3.2 1B (808 MB)'), ('Qwen 2.5 0,5B (491 Mo)', 'Llama 3.2 1B (808 Mo)'), ('Qwen 2.5 0.5B', 'Llama 3.2 1B'), ('Qwen 2.5 0,5B', 'Llama 3.2 1B')):
             text = text.replace(old, new)
         if 'Qwen 2.5' in text:
             raise RuntimeError('Starter model name left in translations')
