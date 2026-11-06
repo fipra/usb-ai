@@ -9,6 +9,7 @@ test('follow-up searches keep the topic while new subjects stay independent', ()
   assert.equal(webSearchQuery('spiega la fotosintesi', history), 'spiega la fotosintesi');
   assert.equal(webSearchQuery('scrivi le formule', []), 'scrivi le formule');
   assert.equal(webSearchQuery('spiega questa', [...history,{role:'user',text:'scrivi le formule'}]), 'la teoria della relativita spiega questa');
+  assert.equal(webSearchQuery('sono state il 3.11.2026', [{role:'user', text:'elezioni USA 2026'}]), 'elezioni USA 2026 sono state il 3.11.2026');
 });
 
 test('web results reject unsafe links, are bounded and are treated as untrusted', () => {
@@ -23,7 +24,8 @@ test('web results reject unsafe links, are bounded and are treated as untrusted'
   assert.equal(results[1].description.length, 450);
   const question = webSearchQuestion('What happened?', results);
   assert.match(question, /untrusted source material/);
-  assert.match(question, /conversation, your knowledge and the web excerpts/);
+  assert.match(question, /only facts explicitly supported/);
+  assert.match(question, /do not use memory to fill gaps/);
   assert.match(question, /\[1\] One/);
   assert.match(question, /User question: What happened\?/);
 });
@@ -40,7 +42,18 @@ test('free search sends only the question to the fixed provider without credenti
   assert.equal(request.options.credentials, 'omit');
   assert.equal(request.options.referrerPolicy, 'no-referrer');
   assert.equal(results[0].title, 'Example');
-  assert.equal(results[0].description, 'Relevant passage');
+  assert.equal(results[0].description, 'Excerpt Relevant passage');
   assert.equal(requests[1].url, 'https://puri.li/api/context');
   await assert.rejects(searchWeb('x', undefined, async()=>({ok:false,status:429})), /WEB_SEARCH_LIMIT/);
+});
+
+test('short requests for percentages retain the user topic, including the reported typo',()=>{
+ const topic='chi ha vinto le elezioni negli stati uniti 2026 novembre';
+ const history=[{role:'user',text:topic},{role:'assistant',text:'A potentially incorrect answer must not become the search topic.'}];
+ for(const q of ['mi si cercare le percentuali??','puoi cercare le percentuali?','e i numeri?','show me the percentages','e il Senato?']) {
+  assert.equal(webSearchQuery(q,history),`${topic} ${q}`);
+  assert.equal(webSearchQuery(q,[]),q);
+ }
+ for(const q of ['percentuali inflazione Italia','chi è Giorgia Meloni?','cerca le percentuali di disoccupazione in Francia']) assert.equal(webSearchQuery(q,history),q);
+ assert.equal(webSearchQuery('e i numeri?',[...history,{role:'user',text:'mi si cercare le percentuali??'}]),`${topic} e i numeri?`);
 });
