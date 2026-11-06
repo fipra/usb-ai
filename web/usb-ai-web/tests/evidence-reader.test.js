@@ -150,3 +150,14 @@ test('Israel question retains English article evidence and has a general fallbac
  const queries=[];await researchArticles(q,'it',undefined,async query=>{queries.push(query);return queries.length===1?[]:[entry]});
  assert.equal(queries.length,2);assert.match(queries[1],/Israel/);
 });
+
+import { publisherArticleLink } from '../evidence-reader.js';
+test('publisher discovery requires a close headline match and same public host',()=>{
+ const headline={publisher:'https://www.publisher.org',title:'Example election commission publishes final results - Publisher'};
+ const good={href:'/politics/results',text:'Example election commission publishes final results'};
+ assert.equal(publisherArticleLink(headline,[good]),'https://www.publisher.org/politics/results');
+ assert.equal(publisherArticleLink(headline,[{...good,href:'https://evil.org/article'}]),null);
+ assert.equal(publisherArticleLink(headline,[{...good,href:'http://www.publisher.org/article'}]),null);
+ assert.equal(publisherArticleLink(headline,[{...good,text:'Example weather forecast'}]),null);
+ assert.equal(publisherArticleLink(headline,[{...good,href:'/'}]),null);
+});
