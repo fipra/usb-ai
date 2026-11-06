@@ -70,3 +70,25 @@ test('research pipeline end to end with injected I/O', async () => {
   assert.equal(result.check.ok, true);
   assert.doesNotMatch(result.answer, /⚠️/);
 });
+
+test('conversation: small talk skips search, history reaches the answer, notes are stripped', async () => {
+  const { isSmallTalk, answerMessages } = await import('../web-rag.js');
+  assert.equal(isSmallTalk('grazie!'), true);
+  assert.equal(isSmallTalk('dove ha studiato'), false);
+  const history = [{role: 'user', text: 'chi è Giorgia Meloni'}, {role: 'assistant', text: 'È la Presidente del Consiglio [1].\n\n> ⚠️ Verifica: x.'}];
+  const messages = answerMessages('dove ha studiato', [{source: 1, title: 'T', url: 'https://it.wikipedia.org/wiki/X', text: 'Testo'}], '2026-11-06', 'it', history);
+  assert.deepEqual(messages.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+  assert.doesNotMatch(messages[2].content, /⚠️/);
+  assert.match(messages[0].content, /conversation/);
+});
+
+test('ages computed from source years are accepted; invented links are removed', async () => {
+  const { finalizeAnswer } = await import('../web-rag.js');
+  const sources = [{source: 1, url: 'https://it.wikipedia.org/wiki/Giorgia_Meloni', text: 'Giorgia Meloni (Roma, 15 gennaio 1977) è una politica italiana.'}];
+  const age = finalizeAnswer('Ha 49 anni: è nata il 15 gennaio 1977 [1].', sources, 'quanti anni ha', 'it', '2026-11-06');
+  assert.doesNotMatch(age.text, /⚠️/);
+  const links = finalizeAnswer('Non ho trovato gli studi [1].\n- Sito: https://www.camcom.it/tema/2003/\n- Wikipedia: https://it.wikipedia.org/wiki/Giorgia_Meloni', sources, '', 'it', '2026-11-06');
+  assert.doesNotMatch(links.text, /camcom|2003/);
+  assert.match(links.text, /wikipedia/);
+  assert.doesNotMatch(links.text, /⚠️/);
+});

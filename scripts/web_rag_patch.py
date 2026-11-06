@@ -7,12 +7,12 @@ def apply(app, root, replace):
     Apply before other patches that rewrite the end of main.js.
     """
     main = app / 'main.js'
-    replace(main, "import './style.css';", "import './style.css';\nimport { gatherSources, answerPrompt, finalizeAnswer, parseWikipediaSearch, wikipediaSearchURL } from './web-rag.js';")
+    replace(main, "import './style.css';", "import './style.css';\nimport { gatherSources, answerMessages, isSmallTalk, finalizeAnswer, parseWikipediaSearch, wikipediaSearchURL } from './web-rag.js';")
     replace(main, 'let thinking = false, semanticEnabled = false;', 'let thinking = false, semanticEnabled = false;\nlet webSearchEnabled = false;')
     replace(main, "$('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');", "renderWebSearch(); $('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');")
     replace(main, "  $('semantic-toggle').disabled = value;", "  $('semantic-toggle').disabled = value;\n  $('web-search-toggle').disabled = value;")
-    replace(main, "let pendingAnswer = '';", "let pendingAnswer = '';\n  let webRagFound = null;")
-    replace(main, "    if (!isRemote(selectedId)) {\n      setStatus(tr('loading'), false, true);", """    if (webSearchEnabled) {
+    replace(main, "let pendingAnswer = '';", "let pendingAnswer = '';\n  let webRagFound = null, webRagToday = '';")
+    replace(main, "    if (!isRemote(selectedId)) {\n      setStatus(tr('loading'), false, true);", """    if (webSearchEnabled && !isSmallTalk(text)) {
       if (isRemote(selectedId)) throw Error(tr('webSearchLocalOnly'));
       if (text.length > 600) throw Error(tr('webSearchLong'));
       setStatus(tr('loading'), false, true);
@@ -29,13 +29,15 @@ def apply(app, root, replace):
       if (!found.sources.length) throw Error(tr('webSearchEmpty'));
       webRagFound = found.sources;
       answer.webSources = found.sources.map(s => ({title:s.title, url:s.url, date:s.date || ''}));
-      const prompt = answerPrompt(text, found.sources, found.today, language);
-      for (const context of contexts) context.splice(0, context.length, {role:'system', content:prompt.system}, {role:'user', content:prompt.user});
+      webRagToday = found.today;
+      // Sources + recent conversation, so follow-up questions stay in context.
+      const messages = answerMessages(text, found.sources, found.today, language, earlierMessages);
+      for (const context of contexts) context.splice(0, context.length, ...messages);
       setStatus(tr('generating'), false, true);
     }
     if (!isRemote(selectedId)) {
       setStatus(tr('loading'), false, true);""")
-    replace(main, 'else answer.text = normalizeThinking(pendingAnswer);', 'else answer.text = normalizeThinking(pendingAnswer);\n    if (webRagFound && answer.text) answer.text = finalizeAnswer(answer.text, webRagFound, text, language).text;')
+    replace(main, 'else answer.text = normalizeThinking(pendingAnswer);', 'else answer.text = normalizeThinking(pendingAnswer);\n    if (webRagFound && answer.text) answer.text = finalizeAnswer(answer.text, webRagFound, text, language, webRagToday).text;')
     replace(main, "if (message.text) content.append(messageActions(chat, message));", """if (message.webSources?.length) {
   const details = node('details', undefined, 'source');
   details.append(node('summary', `${tr('webSearchSources')} (${message.webSources.length})`));
