@@ -82,7 +82,7 @@ test('conversation: small talk skips search, history reaches the answer, notes a
   const messages = answerMessages('dove ha studiato', [{source: 1, title: 'T', url: 'https://it.wikipedia.org/wiki/X', text: 'Testo'}], '2026-11-06', 'it', history);
   assert.deepEqual(messages.map(m => m.role), ['system', 'user', 'assistant', 'user']);
   assert.doesNotMatch(messages[2].content, /⚠️/);
-  assert.match(messages[0].content, /conversation/);
+  assert.match(messages[0].content, /chatting with the user/);
 });
 
 test('ages computed from source years are accepted; invented links are removed', async () => {
