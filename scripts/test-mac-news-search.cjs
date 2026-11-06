@@ -10,6 +10,7 @@ test('news search sends the query locally and excludes headline-only sources', a
     DOMParser: class { parseFromString() { return {querySelector: () => null, querySelectorAll: () => [item]}; } },
     readCandidates: async rows => rows,
     discoverPublisherArticles: async () => [],
+    historicalNewsQuery: () => false, isRecentNewsDate: () => false, sourceDateLabel: () => '',
     researchArticles: async (query,lang,signal,search) => search(query,lang,signal),
     fetch: async (url, options) => { calls.push({url, options}); return {ok:true, text:async()=>'<rss />'}; }
   });
