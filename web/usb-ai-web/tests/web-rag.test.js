@@ -108,3 +108,10 @@ test('follow-ups inherit the subject; invented names are flagged', async () => {
   const good = finalizeAnswer('Si è diplomata all\'Istituto Amerigo Vespucci di Roma [1].', sources, 'dove ha studiato', 'it', '2026-11-06');
   assert.doesNotMatch(good.text, /⚠️/);
 });
+
+test('ages may use a birth year stated earlier in the conversation', async () => {
+  const { finalizeAnswer } = await import('../web-rag.js');
+  const sources = [{source: 1, url: 'https://it.wikipedia.org/wiki/Giorgia_Meloni', text: 'Giorgia Meloni è una politica italiana.'}];
+  assert.doesNotMatch(finalizeAnswer('Ha 49 anni.', sources, 'quanti anni ha', 'it', '2026-11-06', 'chi è giorgia meloni', 'È nata il 15 gennaio 1977.').text, /⚠️/);
+  assert.match(finalizeAnswer('Ha 49 anni.', sources, 'quanti anni ha', 'it', '2026-11-06', 'chi è giorgia meloni', '').text, /49/);
+});

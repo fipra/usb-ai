@@ -267,7 +267,7 @@ const normNumber = n => n.replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.');
 
 // Checks citations and that every number in a cited sentence appears in a cited
 // source (or in the question). Generic: no topic-specific rules.
-export function verifyAnswer(answer, sources, question = '', today = '', context = '') {
+export function verifyAnswer(answer, sources, question = '', today = '', context = '', yearsText = '') {
   const valid = new Set(sources.map(s => s.source));
   const sentences = String(answer).split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(Boolean);
   const invalidCitations = new Set();
@@ -275,7 +275,7 @@ export function verifyAnswer(answer, sources, question = '', today = '', context
   let cited = 0, factual = 0;
   const questionNumbers = new Set([...(question.match(NUMBER) || []), ...(String(today).match(/\d+/g) || [])].map(normNumber));
   // Ages and elapsed years computed from today's date are allowed.
-  const years = [...new Set([...sources.map(s => s.text).join(' ').matchAll(/\b(1[89]\d{2}|20\d{2})\b/g)].map(m => Number(m[1])).concat(String(today).match(/\b20\d{2}\b/g)?.map(Number) || []))];
+  const years = [...new Set([...(sources.map(s => s.text).join(' ') + ' ' + yearsText).matchAll(/\b(1[89]\d{2}|20\d{2})\b/g)].map(m => Number(m[1])).concat(String(today).match(/\b20\d{2}\b/g)?.map(Number) || []))];
   const now = Number((String(today).match(/\b20\d{2}\b/) || [])[0]);
   if (now) for (const b of years) if (now > b && now - b <= 150) { questionNumbers.add(String(now - b)); questionNumbers.add(String(now - b - 1)); }
   for (const sentence of sentences) {
@@ -335,9 +335,9 @@ export function removeInventedLinks(text, sources) {
   }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-export function finalizeAnswer(answer, sources, question = '', language = 'en', today = '', context = '') {
+export function finalizeAnswer(answer, sources, question = '', language = 'en', today = '', context = '', yearsText = '') {
   let text = removeInventedLinks(String(answer).trim(), sources);
-  const check = verifyAnswer(text, sources, question, today, context);
+  const check = verifyAnswer(text, sources, question, today, context, yearsText);
   for (const r of check.invalidCitations) text = text.replaceAll(`[${r}]`, '');
   const w = WARN[language] || WARN.en;
   const notes = [];
@@ -437,6 +437,7 @@ export async function research(question, options) {
   if (!sources.length) return {plan, sources, answer: '', check: null, empty: true};
   onStep('answer', sources.length);
   const answer = await deps.complete({messages: answerMessages(question, sources, today, language, options.history || []), maxTokens: 700});
-  const final = finalizeAnswer(answer, sources, question, language, today, (options.history || []).filter(m => m.role === 'user').map(m => m.text).join(' '));
+  const history = options.history || [];
+  const final = finalizeAnswer(answer, sources, question, language, today, history.filter(m => m.role === 'user').map(m => m.text).join(' '), history.map(m => m.text).join(' '));
   return {plan, sources, answer: final.text, raw: answer, check: final.check};
 }

@@ -11,7 +11,7 @@ def apply(app, root, replace):
     replace(main, 'let thinking = false, semanticEnabled = false;', 'let thinking = false, semanticEnabled = false;\nlet webSearchEnabled = false;')
     replace(main, "$('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');", "renderWebSearch(); $('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');")
     replace(main, "  $('semantic-toggle').disabled = value;", "  $('semantic-toggle').disabled = value;\n  $('web-search-toggle').disabled = value;")
-    replace(main, "let pendingAnswer = '';", "let pendingAnswer = '';\n  let webRagFound = null, webRagToday = '', webRagContext = '';")
+    replace(main, "let pendingAnswer = '';", "let pendingAnswer = '';\n  let webRagFound = null, webRagToday = '', webRagContext = '', webRagYears = '';")
     replace(main, "    if (!isRemote(selectedId)) {\n      setStatus(tr('loading'), false, true);", """    if (webSearchEnabled && !isSmallTalk(text)) {
       if (isRemote(selectedId)) throw Error(tr('webSearchLocalOnly'));
       if (text.length > 600) throw Error(tr('webSearchLong'));
@@ -31,6 +31,7 @@ def apply(app, root, replace):
       answer.webSources = found.sources.map(s => ({title:s.title, url:s.url, date:s.date || ''}));
       webRagToday = found.today;
       webRagContext = earlierMessages.filter(m => m.role === 'user').map(m => m.text).join(' ');
+      webRagYears = earlierMessages.map(m => m.text).join(' ');
       // Sources + recent conversation, so follow-up questions stay in context.
       const messages = answerMessages(text, found.sources, found.today, language, earlierMessages);
       for (const context of contexts) context.splice(0, context.length, ...messages);
@@ -38,7 +39,7 @@ def apply(app, root, replace):
     }
     if (!isRemote(selectedId)) {
       setStatus(tr('loading'), false, true);""")
-    replace(main, 'else answer.text = normalizeThinking(pendingAnswer);', 'else answer.text = normalizeThinking(pendingAnswer);\n    if (webRagFound && answer.text) answer.text = finalizeAnswer(answer.text, webRagFound, text, language, webRagToday, webRagContext).text;')
+    replace(main, 'else answer.text = normalizeThinking(pendingAnswer);', 'else answer.text = normalizeThinking(pendingAnswer);\n    if (webRagFound && answer.text) answer.text = finalizeAnswer(answer.text, webRagFound, text, language, webRagToday, webRagContext, webRagYears).text;')
     replace(main, "if (message.text) content.append(messageActions(chat, message));", """if (message.webSources?.length) {
   const details = node('details', undefined, 'source');
   details.append(node('summary', `${tr('webSearchSources')} (${message.webSources.length})`));
