@@ -18,6 +18,7 @@ LLAMA_PRISM_DUAL_BASE=/nuovo-web/ python3 scripts/build-prism-dual.py
 LLAMA_PRISM_DUAL_BASE=/web-veloce/ python3 scripts/build-prism-dual.py
 LLAMA_PRISM_DUAL_BASE=/intel-prova/ python3 scripts/build-prism-dual.py
 LLAMA_PRISM_DUAL_BASE=/dory-web/ python3 scripts/build-prism-dual.py
+LLAMA_PRISM_DUAL_BASE=/nuovo-ricerca/ python3 scripts/build-prism-dual.py
 
 python3 scripts/build-search-web.py
 python3 scripts/build-news-web.py
