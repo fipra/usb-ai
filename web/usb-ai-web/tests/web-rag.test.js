@@ -139,3 +139,23 @@ test('list markers and labels are not reported as names', async () => {
   const check = verifyAnswer('Ha vinto Jannik Sinner [1].\n- **Vittoria**: Jannik Sinner ha vinto.\n- Fonte: [1]', sources, 'Chi ha vinto Wimbledon 2025?');
   assert.deepEqual(check.unsupportedNames, []);
 });
+
+test('reading does not wait for the English query; its pages join if in time', async () => {
+  const { gatherSources } = await import('../web-rag.js');
+  const page = word => '<article><p>' + (word + ' Matterhorn height is 4,478 metres on the border between Switzerland and Italy. ').repeat(5) + '</p></article>';
+  const reads = [];
+  const deps = {
+    complete: () => new Promise(r => setTimeout(() => r('{"q":"Matterhorn height"}'), 150)),
+    search: async q => q === 'Matterhorn height' ? [{title: 'English', url: 'https://en.example/m', description: 'x'}] : [{title: 'Locale', url: 'https://it.example/c', description: 'x'}],
+    read: async url => { reads.push([url, Date.now()]); return page(url.includes('en.') ? 'English' : 'Locale'); }
+  };
+  const started = Date.now();
+  const result = await gatherSources('Quanto è alto il Cervino?', {language: 'it', deps, readDeadlineMs: 1000});
+  assert.ok(reads[0][1] - started < 120, 'local pages are read before the English query is ready');
+  assert.ok(reads.some(([url]) => url === 'https://en.example/m'), 'English results are read when they arrive in time');
+  assert.ok(result.plan.queries.includes('Matterhorn height'));
+  const slow = {...deps, complete: () => new Promise(r => setTimeout(() => r('{"q":"Matterhorn height"}'), 900))};
+  reads.length = 0;
+  await gatherSources('Quanto è alto il Cervino?', {language: 'it', deps: slow, readDeadlineMs: 1000});
+  assert.ok(!reads.some(([url]) => url === 'https://en.example/m'), 'late English query is not read past the deadline');
+});

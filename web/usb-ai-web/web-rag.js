@@ -411,57 +411,66 @@ function settleBy(promises, ms) {
   });
 }
 
-export async function gatherSources(question, {history = [], language = 'en', deps, maxPages = 7, onStep = () => {}, planWithModel = true, readDeadlineMs = 3500, context: contextOptions = {max: 5, perSource: 2, budget: 3000, maxSources: 4}}) {
-  const now = deps.now || new Date();
-  const today = now.toISOString().slice(0, 10);
-  const plan = quickPlan(question, history);
-  const {resolved, subject} = plan;
-  onStep('search', plan);
-  const top = (list, n) => list.catch(() => []).then(items => items.slice(0, n));
-  // 1. Keyword searches start immediately (Wikipedia in the user's language
-  //    gets the natural question, which its search engine handles well).
-  const quick = [
-    ...(deps.wikipedia ? [top(deps.wikipedia(subject ? plan.wiki : resolved.replace(' — ', ' '), language), 2)] : []),
-    ...plan.queries.map(q => top(deps.search(q), 8))
-  ];
-  // 2. Meanwhile the model writes one English query (skipped for English).
-  let english = Promise.resolve('');
-  if (planWithModel && deps.complete && language !== 'en') {
-    english = deps.complete({user: englishQueryPrompt(resolved.replace(' — ', ': '), today), grammar: ENGLISH_QUERY_GRAMMAR, maxTokens: 40}).then(parseEnglishQuery).catch(() => '');
-  }
-  const englishQuery = await english;
-  const englishWord = englishQuery || plan.wiki;
-  const extra = [
-    ...(deps.wikipedia ? [top(deps.wikipedia(subject && !englishQuery ? plan.wiki : englishWord, 'en'), 2)] : []),
-    ...(englishQuery ? [top(deps.search(englishQuery), 8)] : [])
-  ];
-  if (englishQuery) plan.queries = [...plan.queries, englishQuery];
-  const [wikiLocal, ...webLists] = deps.wikipedia ? await Promise.all(quick) : [[], ...await Promise.all(quick)];
-  const [wikiEn = [], englishWeb = []] = deps.wikipedia ? await Promise.all(extra) : [[], ...(await Promise.all(extra))];
-  // Wikipedia first (best article per language), then interleaved web results.
-  const lists = [wikiEn.slice(0, 1), wikiLocal.slice(0, 1), englishWeb, ...webLists, wikiEn.slice(1), wikiLocal.slice(1)];
-  const results = [];
-  const seen = new Set();
+// Interleaves result lists, skipping URLs already taken.
+function interleave(lists, seen) {
+  const out = [];
   for (let i = 0; i < 10; i++) for (const list of lists) {
     const r = list[i];
     if (!r || !r.url) continue;
     const key = r.url.replace(/#.*$/, '').replace(/\/$/, '');
     if (seen.has(key)) continue;
     seen.add(key);
-    results.push(r);
+    out.push(r);
   }
+  return out;
+}
+
+export async function gatherSources(question, {history = [], language = 'en', deps, maxPages = 7, extraPages = 3, onStep = () => {}, planWithModel = true, readDeadlineMs = 3500, context: contextOptions = {max: 5, perSource: 2, budget: 3000, maxSources: 4}}) {
+  const now = deps.now || new Date();
+  const today = now.toISOString().slice(0, 10);
+  const plan = quickPlan(question, history);
+  const {resolved, subject} = plan;
+  onStep('search', plan);
+  const top = (list, n) => Promise.resolve(list).catch(() => []).then(items => (items || []).slice(0, n));
+  // The model writes one English query in parallel; nothing waits for it.
+  let englishQuery = '';
+  const english = planWithModel && deps.complete && language !== 'en'
+    ? deps.complete({user: englishQueryPrompt(resolved.replace(' — ', ': '), today), grammar: ENGLISH_QUERY_GRAMMAR, maxTokens: 40}).then(parseEnglishQuery).catch(() => '')
+    : Promise.resolve('');
+  // Keyword searches: Wikipedia (user language and English) and the web.
+  const [wikiLocal, wikiEn, ...webLists] = await Promise.all([
+    deps.wikipedia ? top(deps.wikipedia(subject ? plan.wiki : resolved.replace(' — ', ' '), language), 2) : [],
+    deps.wikipedia && language !== 'en' ? top(deps.wikipedia(plan.wiki, 'en'), 1) : [],
+    ...plan.queries.map(q => top(deps.search(q), 8))
+  ]);
+  const seen = new Set();
+  const results = interleave([wikiLocal.slice(0, 1), wikiEn, ...webLists, wikiLocal.slice(1)], seen).slice(0, maxPages);
   onStep('read', results.length);
-  const candidates = results.slice(0, maxPages);
-  const htmls = await settleBy(candidates.map(r => deps.read(r.readUrl || r.url)), readDeadlineMs);
-  const pages = candidates.map((r, rank) => {
-    const html = htmls[rank];
+  // Reading starts at once; the deadline is shared with the English results.
+  const deadline = Date.now() + readDeadlineMs;
+  const reading = settleBy(results.map(r => deps.read(r.readUrl || r.url)), readDeadlineMs);
+  const englishReading = english.then(async q => {
+    englishQuery = q;
+    if (!q || Date.now() > deadline - 800) return [[], []];
+    const [wiki, web] = await Promise.all([deps.wikipedia ? top(deps.wikipedia(q, 'en'), 1) : [], top(deps.search(q), 8)]);
+    const extra = interleave([wiki, web], seen).slice(0, extraPages);
+    const html = await settleBy(extra.map(r => deps.read(r.readUrl || r.url)), Math.max(0, deadline - Date.now()));
+    return [extra, html];
+  }).catch(() => [[], []]);
+  const [htmls, [extra, extraHtmls]] = await Promise.all([reading, englishReading]);
+  if (englishQuery) plan.queries = [...plan.queries, englishQuery];
+  const toPage = (r, html, prior) => {
     const text = html ? htmlToText(html) : '';
     const date = html ? pageDate(html) : '';
     const title = (html && pageTitle(html)) || r.title || r.url;
     // Slow or unreadable pages fall back to the search snippet.
     const body = text.length >= 300 ? text : (r.description || '');
-    return body ? {title, url: r.url, date, text: body, prior: 1 / (1 + rank * 0.25), wiki: !!r.wiki} : null;
-  });
+    return body ? {title, url: r.url, date, text: body, prior, wiki: !!r.wiki} : null;
+  };
+  const pages = [
+    ...results.map((r, rank) => toPage(r, htmls[rank], 1 / (1 + rank * 0.25))),
+    ...extra.map((r, rank) => toPage(r, extraHtmls[rank], 1 / (1 + rank * 0.5)))
+  ];
   let usable = pages.filter(Boolean);
   if (plan.recent) {
     const cutoff = now.getTime() - 14 * 864e5;
