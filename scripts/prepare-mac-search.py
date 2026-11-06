@@ -106,6 +106,26 @@ replace(html, "details.append(el('summary',`[${index+1}] ${source.name}${source.
 # Shared evidence extraction and strict model-output rendering.
 reader = (helpers / 'web/usb-ai-web/evidence-reader.js').read_text().replace('export ', '')
 replace(html, '    function newRequestId(){', reader + '\n    function newRequestId(){')
+# Read the browser/device clock before search or model selection. The existing
+# same-origin chat endpoint persists this bounded, locally formatted reply.
+device_js = (helpers / 'web/usb-ai-web/device-reply.js').read_text().replace('export ', '')
+replace(html, '    function newRequestId(){', device_js + '\n    function newRequestId(){')
+replace(html, "if(!state.model){pendingStarterPrompt=true;", "const localReply=deviceReply(text,state.language);if(!state.model&&localReply===null){pendingStarterPrompt=true;")
+replace(html, 'if(webSearchEnabled){if(text.length', 'if(webSearchEnabled&&localReply===null){if(text.length')
+replace(html, 'requestId,text,webSources,', 'requestId,text,deviceReply:localReply,webSources,')
+replace(rust, '        let previous_messages =', '''        if let Some(reply) = data.get("deviceReply").filter(|v| !v.is_null()) {
+            let reply = reply.as_str().filter(|s| !s.trim().is_empty() && s.len() <= 512 && !s.chars().any(char::is_control)).ok_or("Invalid device reply")?;
+            if data["webSources"].as_array().is_some_and(|items| !items.is_empty()) { return Err("Device replies cannot include web sources".into()); }
+            let chat = &mut self.db.chats[idx];
+            if let Some(index) = edit_index { chat.messages.truncate(index); }
+            if chat.messages.is_empty() && !chat.title_custom { chat.title = text.chars().take(45).collect(); }
+            chat.messages.push(Message { role: "user".into(), text: text.into(), sources: vec![], usage: None });
+            chat.messages.push(Message { role: "assistant".into(), text: reply.into(), sources: vec![], usage: None });
+            self.save()?;
+            update(reply)?;
+            return Ok(self.state());
+        }
+        let previous_messages =''')
 replace(html, "if(!webSources.length)throw Error(tr('webSearchEmpty'))", "const cards=evidenceCards(webQuestion,webSources);webSources=cards.map(c=>({title:c.title+(sourceDateLabel(c.date,state.language)?' · '+sourceDateLabel(c.date,state.language):''),url:c.url,description:c.quote}));if(!webSources.length)throw Error(evidenceMissing(webQuestion,state.language))")
 replace(html, 'delta=>{answer.text+=delta;', 'delta=>{if(webSearchEnabled)return;answer.text+=delta;')
 with rust.open('a') as out:
