@@ -9,18 +9,26 @@ export function webSearchQuery(question, history = []) {
   const detailRequest = value => {
     const tokens = value.toLowerCase().match(/[\p{L}]+/gu) || [];
     const detail = /^(?:percentual[ei]|percentages?|percent|pourcentages?|prozent|porcentajes?|numeri|numbers?|cifre|seggi|seats|voti|votes|dettagli|details|fonti|sources|senato|senate|camera|house)$/;
-    const filler = /^(?:mi|si|sai|puoi|può|potresti|riesci|a|di|il|lo|la|i|gli|le|un|una|del|della|dei|degli|delle|e|ma|invece|anche|per|favore|cerca|cercare|cerchi|cercami|trova|trovare|mostra|mostrare|dimmi|dammi|voglio|quali|sono|con|precisi|esatti|finali|please|can|you|find|search|show|me|the|and|what|about|exact|final|more|et|les|des|cherche|montre|und|die|zeige|bitte|y|los|las|busca|muestra)$/;
+    const filler = /^(?:in|che|quanto|quanta|quanti|quante|hanno|ha|vinto|ottenuto|preso|ricevuto|they|did|win|receive|how|much|many|mi|si|sai|puoi|può|potresti|riesci|a|di|il|lo|la|i|gli|le|un|una|del|della|dei|degli|delle|e|ma|invece|anche|per|favore|cerca|cercare|cerchi|cercami|trova|trovare|mostra|mostrare|dimmi|dammi|voglio|quali|sono|con|precisi|esatti|finali|please|can|you|find|search|show|me|the|and|what|about|exact|final|more|et|les|des|cherche|montre|und|die|zeige|bitte|y|los|las|busca|muestra)$/;
     return tokens.length > 0 && tokens.some(t=>detail.test(t)) && tokens.every(t=>detail.test(t)||filler.test(t));
   };
   const vague = /^(?:continua|approfondisci|spiegami meglio|spiega meglio|dimmi di più|dimmi di piu|continue|explain more|tell me more|continuez|erkläre mehr|continúa|explica más)[.!?\s]*$/i;
   const elliptical = /^(?:sono|erano|è|era|ha|hanno|si sono|they (?:are|were)|it (?:is|was))\b/i;
   if (words.length > 10 || !(reference.test(current) || vague.test(current) || elliptical.test(current) || detailRequest(current))) return current;
   const previous = history.filter(message => message.role === 'user' && typeof message.text === 'string' && message.text.trim());
-  const recent = previous.slice(-4).reverse();
+  const recent = previous.slice(-12).reverse();
   const anchor = recent.find(message => !followup.test(message.text.trim()) && !reference.test(message.text.trim()) && !detailRequest(message.text.trim()) && !vague.test(message.text.trim()) && !elliptical.test(message.text.trim())) || recent[0];
   if (!anchor) return current;
   const topic = anchor.text.trim().slice(0, 300).split(/\s+/).slice(0, Math.max(0, 75 - words.length)).join(' ');
   return `${topic} ${current}`.trim().slice(0, 600);
+}
+
+export function webResearchPlan(question, history = []) {
+  const resolved = webSearchQuery(question, history);
+  const current = question.trim();
+  const intent = /percentual|percentage|percent|pourcentage|prozent|porcentaje|%/i.test(current) ? 'percentage'
+    : /numeri|numbers?|seggi|seats|quanti|how many/i.test(current) ? 'quantity' : 'answer';
+  return Object.freeze({question:resolved, current, inherited:resolved !== current, intent});
 }
 
 export function prepareWebResults(results) {
