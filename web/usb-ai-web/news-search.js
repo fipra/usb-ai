@@ -16,7 +16,7 @@ export function newsQuestion(question, results) {
 }
 export function newsMatchScore(query, entry) {
   const stop = new Set(['delle','della','degli','dello','dalla','sono','quale','cerca','risultati','notizie','the','and','what','when','news','results','from','with','about','this','that','pour','dans','avec','para','las','los','como','oder','die','der','und']);
-  const tokens = value => (value.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || []);
+  const tokens = value => (value.toLowerCase().replace(/\b(?:stati\s+uniti|united\s+states|u\.?s\.?a?\.?)\b/g, ' usa ').match(/[\p{L}\p{N}]{3,}/gu) || []);
   const terms = [...new Set(tokens(query).filter(x => !stop.has(x) && !/^\d{4}$/.test(x)))];
   const words = new Set(tokens(entry.title + ' ' + entry.description.split(': ').slice(1).join(': ')));
   const matches = terms.filter(term => words.has(term)).length;
