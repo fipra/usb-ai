@@ -132,3 +132,10 @@ test('slow pages are dropped at the deadline and replaced by their snippet', asy
   assert.ok(Date.now() - started < 1500);
   assert.ok(result.sources.some(s => s.url === 'https://fast.example/a'));
 });
+
+test('list markers and labels are not reported as names', async () => {
+  const { verifyAnswer } = await import('../web-rag.js');
+  const sources = [{source: 1, url: 'https://en.wikipedia.org/wiki/Jannik_Sinner', text: 'Jannik Sinner won Wimbledon in 2025.'}];
+  const check = verifyAnswer('Ha vinto Jannik Sinner [1].\n- **Vittoria**: Jannik Sinner ha vinto.\n- Fonte: [1]', sources, 'Chi ha vinto Wimbledon 2025?');
+  assert.deepEqual(check.unsupportedNames, []);
+});

@@ -307,11 +307,14 @@ export function verifyAnswer(answer, sources, question = '', today = '', context
   const norm = w => w.toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '');
   for (const sentence of sentences) {
     const words = sentence.replace(/\[\d{1,2}\]/g, '').split(/\s+/);
+    // The first real word (also after list markers like "-" or "**") starts the sentence.
+    const firstWord = words.findIndex(w => /\p{L}/u.test(w));
     let phrase = [], unknown = false;
     const flush = () => { const text = phrase.join(' '); if (unknown && text && !names.includes(text)) names.push(text); phrase = []; unknown = false; };
     words.forEach((raw, index) => {
       const word = raw.split(/['’]/).pop().replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
-      const capital = index > 0 && /^\p{Lu}[\p{L}-]{2,}$/u.test(word) && !/^\p{Lu}+$/u.test(word);
+      // Labels such as "Fonte:" are not names.
+      const capital = index > firstWord && !/:$/.test(raw.replace(/\*+$/, '')) && /^\p{Lu}[\p{L}-]{2,}$/u.test(word) && !/^\p{Lu}+$/u.test(word);
       if (!capital) { flush(); return; }
       phrase.push(word);
       if (word.length >= 4 && !known.includes(norm(word))) unknown = true;
