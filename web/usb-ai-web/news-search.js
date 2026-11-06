@@ -1,4 +1,4 @@
-import { readCandidates, researchArticles } from './evidence-reader.js';
+import { readCandidates, researchArticles, discoverPublisherArticles } from './evidence-reader.js';
 export function prepareNewsResults(results) {
   const clean = value => value.replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
   return results.flatMap(result => {
@@ -34,7 +34,7 @@ async function searchNewsOnce(query, language, signal) {
     const title = item.querySelector('title')?.textContent || '';
     const url = item.querySelector('link')?.textContent || '';
     const date = item.querySelector('pubDate')?.textContent || '';
-    return {title, url, description: `Google News headline only; published ${date}: ${title}`};
+    return {title, url, date, publisher:item.querySelector('source')?.getAttribute('url') || '', description: `Google News headline only; published ${date}: ${title}`};
   });
   {
     const feeds = payload.feeds;
@@ -54,6 +54,8 @@ async function searchNewsOnce(query, language, signal) {
   for (const item of Array.isArray(payload.results) ? payload.results.slice(0,10) : []) {
     if (typeof item.title === 'string' && typeof item.url === 'string') entries.push({discovered:true,title:item.title,url:item.url,description:typeof item.description === 'string' ? item.description : ''});
   }
+  const resolved = await discoverPublisherArticles(entries.filter(e=>e.publisher), '/api/read-article', signal);
+  entries.unshift(...resolved);
   const ranked = entries.map((entry, i) => ({entry, i, score:newsMatchScore(query, entry)})).sort((a,b) => b.score-a.score || Number(b.entry.description.startsWith('RSS summary;')) - Number(a.entry.description.startsWith('RSS summary;')) || a.i-b.i);
   const selected = ranked.filter(x => (x.score > 0 || x.entry.discovered) && !x.entry.url.includes('news.google.com')).map(x => x.entry);
   return readCandidates(selected, '/api/read-article', signal);
