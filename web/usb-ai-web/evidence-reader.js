@@ -1,5 +1,5 @@
 // Shared by browser and native experiments. Documents remain untrusted data.
-export const READER_VERSION = 'evidence-reader-3';
+export const READER_VERSION = 'evidence-reader-3.1';
 export function extractArticle(html) {
   const doc = new DOMParser().parseFromString(html.slice(0, 1048576), 'text/html');
   for (const element of doc.querySelectorAll('script,style,nav,header,footer,aside,form,iframe,noscript')) element.remove();
