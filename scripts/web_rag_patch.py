@@ -39,6 +39,8 @@ def apply(app, root, replace):
     }
     if (!isRemote(selectedId)) {
       setStatus(tr('loading'), false, true);""")
+    # Web answers stream visibly (they are generated without reasoning).
+    replace(main, "if (showGenerationThinking) { answer.text = pendingAnswer; streamView?.update(); }", "if (showGenerationThinking || webRagFound) { answer.text = showGenerationThinking ? pendingAnswer : normalizeThinking(pendingAnswer); streamView?.update(); }")
     replace(main, 'else answer.text = normalizeThinking(pendingAnswer);', 'else answer.text = normalizeThinking(pendingAnswer);\n    if (webRagFound && answer.text) answer.text = finalizeAnswer(answer.text, webRagFound, text, language, webRagToday, webRagContext, webRagYears).text;')
     replace(main, "if (message.text) content.append(messageActions(chat, message));", """if (message.webSources?.length) {
   const details = node('details', undefined, 'source');

@@ -59,13 +59,16 @@ test('research pipeline end to end with injected I/O', async () => {
   const calls = [];
   const deps = {
     now: new Date('2026-11-06T10:00:00Z'),
-    complete: async ({grammar, system}) => { calls.push(grammar ? 'plan' : 'answer'); return grammar ? '{"queries":["Matterhorn height","altezza Cervino"],"recent":false}' : 'Il Cervino è alto 4.478 metri [1].'; },
+    complete: async ({grammar, system}) => { calls.push(grammar ? 'plan' : 'answer'); return grammar ? '{"q":"Matterhorn height"}' : 'Il Cervino è alto 4.478 metri [1].'; },
     search: async () => [{title: 'Matterhorn', url: 'https://example.org/matterhorn', description: 'Matterhorn facts'}],
     wikipedia: async () => [],
     read: async () => '<article><p>The Matterhorn height is 4,478 metres; it lies between Switzerland and Italy near Zermatt.</p><p>' + 'It is one of the most famous mountains of the Alps and attracts many climbers every summer season. '.repeat(4) + '</p></article>'
   };
   const result = await research('Quanto è alto il Cervino?', {language: 'it', deps});
-  assert.deepEqual(calls, ['plan', 'answer']);
+  assert.deepEqual(calls, ['plan', 'answer']);  // one short English query, then the answer
+  calls.length = 0;
+  await research('Quanto è alto il Cervino?', {language: 'it', deps, planWithModel: false});
+  assert.deepEqual(calls, ['answer']);
   assert.equal(result.sources.length, 1);
   assert.equal(result.check.ok, true);
   assert.doesNotMatch(result.answer, /⚠️/);
@@ -114,4 +117,18 @@ test('ages may use a birth year stated earlier in the conversation', async () =>
   const sources = [{source: 1, url: 'https://it.wikipedia.org/wiki/Giorgia_Meloni', text: 'Giorgia Meloni è una politica italiana.'}];
   assert.doesNotMatch(finalizeAnswer('Ha 49 anni.', sources, 'quanti anni ha', 'it', '2026-11-06', 'chi è giorgia meloni', 'È nata il 15 gennaio 1977.').text, /⚠️/);
   assert.match(finalizeAnswer('Ha 49 anni.', sources, 'quanti anni ha', 'it', '2026-11-06', 'chi è giorgia meloni', '').text, /49/);
+});
+
+test('slow pages are dropped at the deadline and replaced by their snippet', async () => {
+  const { gatherSources, quickPlan } = await import('../web-rag.js');
+  assert.deepEqual(quickPlan('dove ha studiato', [{role: 'user', text: 'chi è giorgia meloni'}]).wiki, 'giorgia meloni');
+  const page = '<article><p>' + 'The Matterhorn is 4,478 metres high and lies on the border between Switzerland and Italy. '.repeat(5) + '</p></article>';
+  const deps = {
+    search: async () => [{title: 'Fast', url: 'https://fast.example/a', description: 'x'}, {title: 'Slow', url: 'https://slow.example/b', description: 'Slow snippet about the Matterhorn height of 4,478 metres in the Alps mountains.'}],
+    read: url => url.includes('slow') ? new Promise(r => setTimeout(() => r(page), 2000)) : Promise.resolve(page)
+  };
+  const started = Date.now();
+  const result = await gatherSources('Quanto è alto il Cervino Matterhorn?', {language: 'it', deps, readDeadlineMs: 200});
+  assert.ok(Date.now() - started < 1500);
+  assert.ok(result.sources.some(s => s.url === 'https://fast.example/a'));
 });

@@ -45,6 +45,20 @@ export function planPrompt(question, history = [], today = '', language = 'en') 
   ].filter(Boolean).join('\n');
 }
 
+// Fast variant: one short English query (~10 tokens), generated while the
+// keyword search is already running.
+export const ENGLISH_QUERY_GRAMMAR = String.raw`root ::= "{\"q\":\"" c{3,80} "\"}"
+c ::= [^"\\\x00-\x1f]`;
+export function englishQueryPrompt(question, today = '') {
+  return `Today is ${today || 'unknown'}. Write one short English web search query (max 8 words) to answer: ${question.trim().slice(0, 400)}\nUse names, places and years. Do not answer. Return ONLY JSON like {"q":"..."}.`;
+}
+export function parseEnglishQuery(raw) {
+  try {
+    const q = JSON.parse(String(raw).replace(/^```(?:json)?\s*|\s*```$/g, '').trim()).q;
+    return typeof q === 'string' && q.trim().length >= 3 ? q.replace(/[\u0000-\u001f]+/g, ' ').trim().slice(0, 120) : '';
+  } catch { return ''; }
+}
+
 export function parsePlan(raw, question) {
   const fallback = {queries: [question.trim().slice(0, 200)], recent: false};
   try {
@@ -181,10 +195,13 @@ export function rankChunks(chunks, queryText, {k1 = 1.4, b = 0.75, subject = ''}
     if (subjectTerms.length && subjectTerms.every(t => titleTerms.has(t))) score *= 2;
     else if (subjectTerms.length && !subjectTerms.every(t => docs[i].includes(t))) score *= 0.5;
     score *= 1 + 0.6 * (chunk.prior ?? 0.5);
+    // Encyclopedia articles are more reliable than keyword-dense pages (odds, SEO).
+    if (chunk.wiki) score *= 1.6;
     // A page titled with other years only is likely about another edition.
     const titleYears = (chunk.title || '').match(/\b(?:19|20)\d{2}\b/g) || [];
     if (years.length && titleYears.length && !titleYears.some(y => years.includes(y))) score *= 0.3;
-    return {...chunk, score};
+    // Search position breaks ties, so pages in another language are not dropped.
+    return {...chunk, lexical: score, score: score + 0.05 * (chunk.prior ?? 0.5)};
   }).sort((a, b) => b.score - a.score);
 }
 
@@ -193,8 +210,10 @@ export function selectContext(ranked, {max = 8, perSource = 3, budget = 6400, ma
   const counts = new Map();
   const picked = [];
   let used = 0;
-  for (const chunk of ranked) {
-    if (chunk.score <= 0 || picked.length >= max) continue;
+  // Without any word in common (e.g. another language) fall back to search order.
+  const pool = ranked.some(c => c.lexical > 0) ? ranked.filter(c => c.lexical > 0) : ranked;
+  for (const chunk of pool) {
+    if (picked.length >= max) continue;
     const n = counts.get(chunk.url) || 0;
     if (n >= perSource || used + chunk.text.length > budget) continue;
     if (!n && counts.size >= maxSources) continue;
@@ -372,32 +391,61 @@ export function parseWikipediaSearch(json, lang = 'en') {
 // ---------- Orchestration (I/O injected) ----------
 // deps: {complete({system,user,grammar,maxTokens}) -> string, search(query) -> [{title,url,description}],
 //        read(url) -> html|null, wikipedia?(query, lang) -> [{title,url,description}], now?: Date}
-export async function gatherSources(question, {history = [], language = 'en', deps, maxPages = 6, onStep = () => {}}) {
-  const now = deps.now || new Date();
-  const today = now.toISOString().slice(0, 10);
-  onStep('plan');
-  const raw = await deps.complete({user: planPrompt(resolveFollowUp(question, history), history, today, language), grammar: PLAN_GRAMMAR, maxTokens: 160});
+const RECENT = /notizi|\bnews\b|oggi|ieri|latest|ultime ore|heute|nouvelles|nachrichten|noticias|hoy|today|yesterday/i;
+const keywordsOf = text => (String(text).toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '').match(/[\p{L}\p{N}]+/gu) || [])
+  .filter(t => (t.length >= 3 || /^\d+$/.test(t)) && !STOP.has(t));
+
+// Fast plan without a model call: keywords of the (resolved) question plus the
+// question itself; Wikipedia gets the subject. Saves a full LLM generation.
+export function quickPlan(question, history = []) {
   const resolved = resolveFollowUp(question, history);
-  const plan = parsePlan(raw, resolved);
-  // Follow-up: the first query (also used for Wikipedia) always carries the
-  // inherited subject, in case the model's plan lost it.
   const followUp = resolved !== question.trim();
   const subject = followUp ? resolved.split(' — ')[0] : '';
-  if (followUp) {
-    const keywords = s => (s.toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '').match(/[\p{L}\p{N}]+/gu) || []).filter(t => (t.length >= 3 || /^\d+$/.test(t)) && !STOP.has(t));
-    const first = [...new Set(keywords(resolved))].join(' ').slice(0, 200);
-    if (first) plan.queries = [first, ...plan.queries.filter(q => q.toLowerCase() !== first)].slice(0, 3);
-    plan.wiki = [...new Set(keywords(subject))].join(' ').slice(0, 200) || first;
-  }
+  const keys = [...new Set(keywordsOf(resolved))].join(' ').slice(0, 200);
+  const queries = [...new Set([keys, followUp ? resolved.replace(' — ', ' ') : question.trim()].filter(q => q && q.length >= 2).map(q => q.slice(0, 200)))];
+  return {queries: queries.length ? queries : [question.trim().slice(0, 200)], recent: RECENT.test(question), wiki: [...new Set(keywordsOf(subject))].join(' ') || keys, resolved, subject};
+}
+
+// Resolves with the values that arrive before the deadline; later ones are dropped.
+function settleBy(promises, ms) {
+  const results = new Array(promises.length).fill(null);
+  return new Promise(resolve => {
+    let pending = promises.length;
+    const timer = setTimeout(() => resolve(results), ms);
+    if (!pending) { clearTimeout(timer); resolve(results); }
+    promises.forEach((promise, i) => promise.then(value => { results[i] = value; }, () => {}).finally(() => { if (--pending === 0) { clearTimeout(timer); resolve(results); } }));
+  });
+}
+
+export async function gatherSources(question, {history = [], language = 'en', deps, maxPages = 7, onStep = () => {}, planWithModel = true, readDeadlineMs = 3500, context: contextOptions = {max: 6, perSource: 2, budget: 4400, maxSources: 5}}) {
+  const now = deps.now || new Date();
+  const today = now.toISOString().slice(0, 10);
+  const plan = quickPlan(question, history);
+  const {resolved, subject} = plan;
   onStep('search', plan);
-  const wiki = deps.wikipedia ? [
-    deps.wikipedia(plan.wiki || plan.queries[0], 'en').catch(() => []),
-    ...(language !== 'en' ? [deps.wikipedia(plan.wiki || plan.queries[1] || plan.queries[0], language).catch(() => [])] : [])
-  ] : [];
-  const [wikiLists, lists] = await Promise.all([Promise.all(wiki), Promise.all(plan.queries.map(q => deps.search(q).catch(() => [])))]);
-  // Top Wikipedia article per language first, then interleaved web results.
-  lists.unshift(...wikiLists.map(list => list.slice(0, 1)));
-  // Interleave results so every query contributes its best hits.
+  const top = (list, n) => list.catch(() => []).then(items => items.slice(0, n));
+  // 1. Keyword searches start immediately (Wikipedia in the user's language
+  //    gets the natural question, which its search engine handles well).
+  const quick = [
+    ...(deps.wikipedia ? [top(deps.wikipedia(subject ? plan.wiki : resolved.replace(' — ', ' '), language), 2)] : []),
+    ...plan.queries.map(q => top(deps.search(q), 8))
+  ];
+  // 2. Meanwhile the model writes one English query (skipped for English).
+  let english = Promise.resolve('');
+  if (planWithModel && deps.complete && language !== 'en') {
+    english = deps.complete({user: englishQueryPrompt(resolved.replace(' — ', ': '), today), grammar: ENGLISH_QUERY_GRAMMAR, maxTokens: 40}).then(parseEnglishQuery).catch(() => '');
+  }
+  const englishQuery = await english;
+  const englishWord = englishQuery || plan.wiki;
+  const extra = [
+    ...(deps.wikipedia ? [top(deps.wikipedia(subject && !englishQuery ? plan.wiki : englishWord, 'en'), 2)] : []),
+    ...(englishQuery ? [top(deps.search(englishQuery), 8)] : [])
+  ];
+  if (englishQuery) plan.queries = [...plan.queries, englishQuery];
+  const [wikiLocal, ...webLists] = deps.wikipedia ? await Promise.all(quick) : [[], ...await Promise.all(quick)];
+  const [wikiEn = [], englishWeb = []] = deps.wikipedia ? await Promise.all(extra) : [[], ...(await Promise.all(extra))];
+  // Wikipedia first (best article per language), then interleaved web results.
+  const lists = [wikiEn.slice(0, 1), wikiLocal.slice(0, 1), englishWeb, ...webLists, wikiEn.slice(1), wikiLocal.slice(1)];
   const results = [];
   const seen = new Set();
   for (let i = 0; i < 10; i++) for (const list of lists) {
@@ -409,26 +457,26 @@ export async function gatherSources(question, {history = [], language = 'en', de
     results.push(r);
   }
   onStep('read', results.length);
-  const pages = await Promise.all(results.slice(0, maxPages + 2).map(async (r, rank) => {
-    const html = await deps.read(r.readUrl || r.url).catch(() => null);
+  const candidates = results.slice(0, maxPages);
+  const htmls = await settleBy(candidates.map(r => deps.read(r.readUrl || r.url)), readDeadlineMs);
+  const pages = candidates.map((r, rank) => {
+    const html = htmls[rank];
     const text = html ? htmlToText(html) : '';
     const date = html ? pageDate(html) : '';
     const title = (html && pageTitle(html)) || r.title || r.url;
-    // Fall back to the search snippet when the page cannot be read.
+    // Slow or unreadable pages fall back to the search snippet.
     const body = text.length >= 300 ? text : (r.description || '');
-    // Search position is a weak prior: earlier results are usually more relevant.
-    return body ? {title, url: r.url, date, text: body, prior: 1 / (1 + rank * 0.25)} : null;
-  }));
+    return body ? {title, url: r.url, date, text: body, prior: 1 / (1 + rank * 0.25), wiki: !!r.wiki} : null;
+  });
   let usable = pages.filter(Boolean);
   if (plan.recent) {
     const cutoff = now.getTime() - 14 * 864e5;
     const fresh = usable.filter(p => p.date && Date.parse(p.date) >= cutoff);
     if (fresh.length >= 2) usable = [...fresh, ...usable.filter(p => !fresh.includes(p))];
   }
-  const chunks = usable.slice(0, maxPages + 2).flatMap(p => chunkText(p.text).map(text => ({title: p.title, url: p.url, date: p.date, prior: p.prior, text})));
+  const chunks = usable.flatMap(p => chunkText(p.text, 700).map(text => ({title: p.title, url: p.url, date: p.date, prior: p.prior, wiki: p.wiki, text})));
   const ranked = rankChunks(chunks, [resolved, ...plan.queries].join(' '), {subject});
-  const context = selectContext(ranked);
-  return {plan, sources: sourcesFromContext(context), today, resolved};
+  return {plan, sources: sourcesFromContext(selectContext(ranked, contextOptions)), today, resolved};
 }
 
 export async function research(question, options) {
