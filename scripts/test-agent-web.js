@@ -1,0 +1,11 @@
+const assert = require('node:assert/strict');
+const {agentWebQuery} = require('./agent-web-search.js');
+const call = query => `<use_mcp_tool><server_name>web</server_name><tool_name>google_search</tool_name><arguments>${JSON.stringify({query})}</arguments></use_mcp_tool>`;
+assert.equal(agentWebQuery(call('Einstein relatività formule')), 'Einstein relatività formule');
+assert.equal(agentWebQuery('No search necessary.'), null);
+assert.equal(agentWebQuery(call('   ')), null);
+assert.equal(agentWebQuery(call('x'.repeat(601))), null);
+assert.equal(agentWebQuery(call('ok').replace('google_search', 'run_command')), null);
+assert.equal(agentWebQuery(call('ok').replace('"query":"ok"', '"query":"ok","url":"https://example.com"')), null);
+assert.equal(agentWebQuery(call('ok').replace('{"query":"ok"}', '{bad json}')), null);
+console.log('Agent search request validation passed.');
