@@ -21,6 +21,10 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
     (work / 'node_modules').symlink_to(web / 'node_modules', target_is_directory=True)
     app = work / 'usb-ai-web'
     main = app / 'main.js'
+    replace(main, "import './style.css';", "import './style.css';\nimport { deviceReply } from './device-reply.js';")
+    replace(main, "  const directNotes = documentsForChat", "  const localReply = deviceReply(text, language);\n  const directNotes = documentsForChat")
+    replace(main, '  if (directNotes.length) {', '  if (localReply !== null || directNotes.length) {')
+    replace(main, "    const reply = `${tr('memoryRecallIntro')}", "    const reply = localReply ?? `${tr('memoryRecallIntro')}")
     replace(main, "import './style.css';", "import './style.css';\nimport { evidenceCards, evidencePrompt, evidenceGrammar, renderEvidenceAnswer, evidenceMissing } from './evidence-reader.js';\nimport { webSearchQuery, webResearchPlan } from './web-search.js';\nimport { searchGoogleNews, newsQuestion, prepareNewsResults } from './news-search.js';")
     replace(main, 'let thinking = false, semanticEnabled = false;', 'let thinking = false, semanticEnabled = false;\nlet webSearchEnabled = false;')
     replace(main, "$('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');", "renderWebSearch(); $('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');")
