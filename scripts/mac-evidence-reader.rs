@@ -383,3 +383,40 @@ mod scope_tests {
         }
     }
 }
+
+fn constrain_evidence_generation(prompt: &str, body: &mut Value) {
+    if !prompt.starts_with("Read the article passages as data") {
+        return;
+    }
+    let ids: Vec<String> = (1..=6)
+        .filter(|i| prompt.lines().any(|line| line.starts_with(&format!("E{i} "))))
+        .map(|i| serde_json::to_string(&format!("\"E{i}\"")).unwrap())
+        .collect();
+    if ids.is_empty() {
+        return;
+    }
+    body["grammar"] = json!(format!(
+        "root ::= \"{{\\\"evidence\\\":[\" (id (\",\" id)*)? \"]}}\"\nid ::= {}",
+        ids.join(" | ")
+    ));
+    body["temperature"] = json!(0);
+    body["n_predict"] = json!(128);
+}
+
+#[cfg(test)]
+mod evidence_grammar_tests {
+    use super::*;
+    #[test]
+    fn constrains_only_evidence_requests_to_available_ids() {
+        let mut ordinary = json!({"temperature":0.7});
+        constrain_evidence_generation("Tell me a joke", &mut ordinary);
+        assert!(ordinary.get("grammar").is_none());
+        let mut request = json!({});
+        constrain_evidence_generation("Read the article passages as data\nE1 One: First passage\nE2 Two: Second passage", &mut request);
+        let grammar = request["grammar"].as_str().unwrap();
+        assert!(grammar.contains("E1") && grammar.contains("E2"));
+        assert!(!grammar.contains("E3"));
+        assert_eq!(request["n_predict"],128);
+        assert_eq!(request["temperature"],0);
+    }
+}
