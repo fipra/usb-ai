@@ -108,3 +108,29 @@ test('a percentage follow-up carries context into evidence selection, not the pr
  assert.equal(evidenceCards(resolved,[source(control),source(poll)]).length,0);
  assert.match(evidenceMissing(resolved,'it'),/percentuali pertinenti/);
 });
+
+test('public article cache expires and evicts with a bounded memory footprint',async()=>{
+ const {createArticleCache}=await import('../evidence-reader.js');let now=0;const cache=createArticleCache(2,60,()=>now);
+ cache.put('a',{description:'A'});cache.put('b',{description:'B'});const a=cache.get('a');a.description='changed';assert.equal(cache.get('a').description,'A');
+ cache.put('c',{description:'C'});assert.equal(cache.get('b'),null);assert.equal(cache.size,2);now=60;assert.equal(cache.get('a'),null);
+});
+test('useful follow-up articles displace a full irrelevant first batch',async()=>{
+ const {researchArticles}=await import('../evidence-reader.js');let calls=0;
+ const irrelevant=Array.from({length:6},(_,i)=>({...source(local),url:`https://www.bbc.com/${i}`}));
+ const result=await researchArticles(userQuestion,'it',undefined,async()=>++calls===1?irrelevant:[{...source(control),url:'https://www.bbc.com/decisive'}]);
+ assert.equal(calls,2);assert.equal(result.length,6);assert.equal(result[0].url,'https://www.bbc.com/decisive');
+});
+
+test('article reader limits concurrency, reuses fresh content and honors cancellation',async()=>{
+ const {readCandidates}=await import('../evidence-reader.js');
+ const previousFetch=globalThis.fetch,previousParser=globalThis.DOMParser;let active=0,peak=0,calls=0;
+ const paragraph='A public article with enough text for extraction. '.repeat(8);
+ globalThis.DOMParser=class{parseFromString(){return {querySelectorAll:()=>[],querySelector:selector=>selector==='main'?{querySelectorAll:()=>[{textContent:paragraph}]}:null};}};
+ globalThis.fetch=async()=>{calls++;active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,5));active--;return {ok:true,json:async()=>({html:'<main>fixture</main>'})};};
+ const entries=Array.from({length:8},(_,i)=>({url:`https://www.bbc.com/bounded-${i}`,title:'Fixture'}));
+ try{
+  const first=await readCandidates(entries,'/test-reader');assert.equal(first.length,6);assert.equal(calls,6);assert.ok(peak<=3);
+  await readCandidates(entries,'/test-reader');assert.equal(calls,6);
+  const controller=new AbortController();controller.abort();await assert.rejects(readCandidates(entries,'/test-reader',controller.signal));assert.equal(calls,6);
+ }finally{globalThis.fetch=previousFetch;globalThis.DOMParser=previousParser;}
+});
