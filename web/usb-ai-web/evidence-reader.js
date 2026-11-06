@@ -1,15 +1,15 @@
 // Shared by browser and native experiments. Documents remain untrusted data.
-export const READER_VERSION = 'evidence-reader-2.2';
+export const READER_VERSION = 'evidence-reader-3';
 export function extractArticle(html) {
   const doc = new DOMParser().parseFromString(html.slice(0, 1048576), 'text/html');
   for (const element of doc.querySelectorAll('script,style,nav,header,footer,aside,form,iframe,noscript')) element.remove();
   const main = doc.querySelector('main');
   const roots = main ? [main] : Array.from(doc.querySelectorAll('article'));
-  if (!roots.length) return '';
+  if (!roots.length && doc.body) roots.push(doc.body);
   return roots.flatMap(root => Array.from(root.querySelectorAll('p'))).map(p => p.textContent.replace(/\s+/g,' ').trim()).filter(p => p.length >= 20).join('\n').slice(0, 80000);
 }
 // Scope is part of relevance: a demographic majority is not control of a chamber.
-const normalizeEvidence = s => s.toLowerCase().normalize('NFKD').replace(/\p{M}/gu,'').replace(/\b(?:stati uniti|united states|usa|u\.s\.|us)\b/g,'usa').replace(/elezioni|elections|midterms/g,'election');
+const normalizeEvidence = s => s.toLowerCase().replace(/israele|israelischen|israéliennes|israelíes/g,'israel').normalize('NFKD').replace(/\p{M}/gu,'').replace(/\b(?:stati uniti|united states|usa|u\.s\.|us)\b/g,'usa').replace(/elezioni|elections|midterms/g,'election');
 export function percentageQuestion(question) { return /percentual|percentage|percent|pourcentage|prozent|porcentaje|%/i.test(question); }
 export function evidenceMissing(question, language='en') {
   const messages={
@@ -20,7 +20,7 @@ export function evidenceMissing(question, language='en') {
     es:'La búsqueda tiene en cuenta el contexto, pero los artículos leídos no aportan porcentajes pertinentes. Los escaños y las encuestas de grupos no permiten deducir porcentajes de voto.'
   };
   if(percentageQuestion(question))return messages[language]||messages.en;
-  return ({en:'No relevant article text could be read.',it:'Non è stato possibile leggere articoli pertinenti.',fr:'Aucun article pertinent n’a pu être lu.',de:'Keine passenden Artikel lesbar.',es:'No se pudieron leer artículos pertinentes.'})[language]||'No relevant article text could be read.';
+  return ({en:'No usable article text was retrieved. This does not mean there is no news on this topic.',it:'Non ho recuperato testi utilizzabili. Questo non significa che non esistano notizie sul tema.',fr:'Aucun article pertinent n’a pu être lu.',de:'Keine passenden Artikel lesbar.',es:'No se pudieron leer artículos pertinentes.'})[language]||'No usable article text was retrieved. This does not mean there is no news on this topic.';
 }
 export function nationalOutcomeQuestion(question) {
   return !percentageQuestion(question) && /elezion|election|midterm/i.test(question) && /vinto|vincitor|risultat|won|winner|results/i.test(question)
@@ -35,7 +35,7 @@ export function nationalOutcomePassage(quote) {
     && !/\b(?:one|two|three|four|five|six|seven|eight|nine|another|a) (?:\w+ )?seats?\b/i.test(quote);
 }
 export function evidenceCards(question, entries) {
-  const stop = new Set(['chi','che','delle','della','negli','gli','the','and','what','risultati','results','novembre','november','vinto','won']);
+  const stop = new Set(['notizie','news','sulle','sugli','sulla','sul','cerca','chi','che','delle','della','negli','gli','the','and','what','risultati','results','novembre','november','vinto','won']);
   const terms = [...new Set(normalizeEvidence(question).match(/[\p{L}\p{N}]{3,}/gu) || [])].filter(t => !stop.has(t));
   const years = question.match(/\b20\d{2}\b/g) || [];
   const national = nationalOutcomeQuestion(question);
@@ -47,7 +47,7 @@ export function evidenceCards(question, entries) {
     const text = normalizeEvidence(entry.title + ' ' + entry.description + ' ' + (entry.date || ''));
     if (years.length && !years.some(y => text.includes(y))) return;
     const matches = terms.filter(t => text.includes(t)).length;
-    if (matches < Math.min(2, terms.length) || !terms.length) return;
+    if (matches < 1 || !terms.length) return;
     const passages = entry.description.split(/\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ý])/u).filter(p => p.length >= 30 && p.length <= 1100);
     passages.forEach((quote, order) => {
       const mentioned = quote.match(/\b20\d{2}\b/g) || [];
@@ -118,6 +118,9 @@ export function renderEvidenceAnswer(raw, cards, language = 'en') {
   const selected = [...new Set(ids)].map(id => cards.find(c => c.id === id));
   return selected.length ? label[0] + '\n\n' + selected.map(c => `“${c.quote}” [${c.source}]`).join('\n\n') : label[1];
 }
+export function publicArticleURL(value) {
+ try {const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&!/[\u0000-\u0020\\]/.test(value)&&/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,63}$/i.test(u.hostname)&&!/\.(?:local|localhost|internal|test|invalid|example|home|lan)$/i.test(u.hostname);}catch{return false;}
+}
 export const READABLE_PUBLISHERS = new Set(['www.bbc.com','www.bbc.co.uk','www.theguardian.com','www.ansa.it','tg24.sky.it','www.vaticannews.va','www.ilpost.it','apnews.com','www.reuters.com']);
 // Session-only bounded cache. It stores public article text, never chat or questions.
 export function createArticleCache(maxEntries=24, ttlMs=60000, clock=Date.now) {
@@ -132,7 +135,7 @@ const articleCache=createArticleCache();
 export async function readCandidates(entries, endpoint, signal) {
   const seen = new Set();
   const candidates = entries.filter(entry => {
-    try { const url = new URL(entry.url); url.hash=''; if (url.protocol !== 'https:' || url.username || url.password || url.port || !READABLE_PUBLISHERS.has(url.hostname) || seen.has(url.href)) return false; seen.add(url.href); return true; } catch { return false; }
+    try { const url = new URL(entry.url); url.hash=''; if (url.protocol !== 'https:' || url.username || url.password || url.port || !publicArticleURL(url.href) || seen.has(url.href)) return false; seen.add(url.href); return true; } catch { return false; }
   }).slice(0,6);
   const results=new Array(candidates.length);let cursor=0;
   const worker=async()=>{
@@ -175,7 +178,7 @@ export async function researchArticles(query, language, signal, search) {
   if (percentageQuestion(query) && !cards.length) missing += ' vote share percentage';
   if (nationalOutcomeQuestion(query) && !controlSummary(cards, language)) missing += ' House Senate control majority winner';
   if (cards.length && !missing && (!asksOutcome || hasOutcome)) return first;
-  const alternate = query.replace(/chi ha vinto(?: le)?/gi,'winners').replace(/stati uniti/gi,'USA').replace(/elezioni/gi,'election').replace(/medio termine|metà mandato/gi,'midterm').replace(/risultati/gi,'results').replace(/novembre/gi,'November');
+  const alternate = query.replace(/chi ha vinto(?: le)?/gi,'winners').replace(/stati uniti/gi,'USA').replace(/elezioni/gi,'election').replace(/medio termine|metà mandato/gi,'midterm').replace(/risultati/gi,'results').replace(/novembre/gi,'November').replace(/notizie|sulle|sulla|sugli/gi,' ').replace(/israele/gi,'Israel').replace(/\s+/g,' ').trim();
   const followup = (alternate + missing).trim().slice(0,600);
   if (followup === query.trim()) return first;
   try {
