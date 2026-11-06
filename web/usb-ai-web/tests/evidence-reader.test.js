@@ -161,3 +161,23 @@ test('publisher discovery requires a close headline match and same public host',
  assert.equal(publisherArticleLink(headline,[{...good,text:'Example weather forecast'}]),null);
  assert.equal(publisherArticleLink(headline,[{...good,href:'/'}]),null);
 });
+
+import { isRecentNewsDate, requiresFreshNews, sourceDateLabel, evidenceGrammar, researchArticles } from '../evidence-reader.js';
+test('news freshness uses a 72 hour publication window, rejects missing and future dates',()=>{
+ const now=Date.parse('2026-11-06T12:00:00Z');
+ assert.equal(isRecentNewsDate('2026-11-05T12:00:00Z',now),true);
+ assert.equal(isRecentNewsDate('2026-11-03T12:00:00Z',now),true);
+ for(const value of ['','unknown','2026-11-03T11:59:59Z','2025-11-06','2026-11-07'])assert.equal(isRecentNewsDate(value,now),false,value);
+ assert.equal(requiresFreshNews('notizie sulle elezioni in israele',now),true);
+ assert.equal(requiresFreshNews('notizie sulle elezioni del 2018',now),false);
+ assert.ok(sourceDateLabel('2026-11-06T12:00:00Z','it').includes('2026'));
+ assert.equal(sourceDateLabel('not a date','it'),'');
+});
+test('freshness survives compact and translated search queries',async()=>{
+ const calls=[];await researchArticles('notizie sulle elezioni in israele','it',undefined,async(q,l,s,fresh)=>{calls.push({q,fresh});return [];});
+ assert.equal(calls.length,2);assert.ok(calls.every(c=>c.fresh));assert.ok(!calls[0].q.includes('notizie'));
+});
+test('selection grammar permits only the provided evidence identifiers',()=>{
+ const grammar=evidenceGrammar([{id:'E1'},{id:'E2'}]);
+ assert.ok(grammar.includes('E1')&&grammar.includes('E2'));assert.ok(!grammar.includes('E3'));assert.ok(grammar.includes('root ::='));
+});
