@@ -58,7 +58,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
 if (message.webSources?.length) {
   const details = node('details', undefined, 'source');
   details.append(node('summary', `${tr('webSearchSources')} (${message.webSources.length})`));
-  for (const [index, source] of prepareNewsResults(message.webSources).entries()) {
+  for (const [index, source] of prepareNewsResults(message.webSources, language).entries()) {
     const row = node('p'); const link = node('a', `[${index + 1}] ${source.title}`);
     link.href = source.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; row.append(link); row.append(node('div', source.description)); details.append(row);
   }
