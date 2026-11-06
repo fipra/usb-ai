@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
     (work / 'node_modules').symlink_to(web / 'node_modules', target_is_directory=True)
     app = work / 'usb-ai-web'
     main = app / 'main.js'
-    replace(main, "import './style.css';", "import './style.css';\nimport { evidenceCards, evidencePrompt, renderEvidenceAnswer, evidenceMissing } from './evidence-reader.js';\nimport { webSearchQuery, webResearchPlan } from './web-search.js';\nimport { searchGoogleNews, newsQuestion, prepareNewsResults } from './news-search.js';")
+    replace(main, "import './style.css';", "import './style.css';\nimport { evidenceCards, evidencePrompt, evidenceGrammar, renderEvidenceAnswer, evidenceMissing } from './evidence-reader.js';\nimport { webSearchQuery, webResearchPlan } from './web-search.js';\nimport { searchGoogleNews, newsQuestion, prepareNewsResults } from './news-search.js';")
     replace(main, 'let thinking = false, semanticEnabled = false;', 'let thinking = false, semanticEnabled = false;\nlet webSearchEnabled = false;')
     replace(main, "$('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');", "renderWebSearch(); $('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');")
     replace(main, "  $('semantic-toggle').disabled = value;", "  $('semantic-toggle').disabled = value;\n  $('web-search-toggle').disabled = value;")
@@ -49,6 +49,10 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
     if (!isRemote(selectedId)) {
       setStatus(tr('loading'), false, true);""")
     replace(main, 'else answer.text = normalizeThinking(pendingAnswer);', 'else answer.text = answer.evidenceCards ? renderEvidenceAnswer(normalizeThinking(pendingAnswer), answer.evidenceCards, language) : normalizeThinking(pendingAnswer);')
+    replace(main, 'streamChat(messages, onToken, signal, thinking, outputLimit, temperature)', 'streamChat(messages, onToken, signal, webSearchEnabled ? false : thinking, webSearchEnabled ? 128 : outputLimit, webSearchEnabled ? 0 : temperature, answer.evidenceCards ? evidenceGrammar(answer.evidenceCards) : undefined)')
+    runtime = app / 'runtime.js'
+    replace(runtime, 'temperature = 0.7) {', 'temperature = 0.7, grammar) {')
+    replace(runtime, '    max_tokens: maxTokens,', '    max_tokens: grammar ? 128 : maxTokens,\n    ...(grammar ? {grammar} : {}),')
     replace(main, 'const showGenerationThinking = thinking;', 'const showGenerationThinking = thinking && !webSearchEnabled;')
     replace(main, "if (message.text) content.append(messageActions(chat, message));", """if (message.researchQuestion) content.append(node('p', tr('webResearchQuestion') + ' ' + message.researchQuestion, 'hint'));
 if (message.webSources?.length) {
