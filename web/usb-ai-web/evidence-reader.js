@@ -47,7 +47,7 @@ export function evidenceCards(question, entries) {
     const text = normalizeEvidence(entry.title + ' ' + entry.description + ' ' + (entry.date || ''));
     if (years.length && !years.some(y => text.includes(y))) return;
     const matches = terms.filter(t => text.includes(t)).length;
-    if (matches < 1 || !terms.length) return;
+    if (matches < Math.min(2, terms.length) || !terms.length) return;
     const passages = entry.description.split(/\n+|(?<=[.!?])\s+(?=[A-ZÀ-Ý])/u).filter(p => p.length >= 30 && p.length <= 1100);
     passages.forEach((quote, order) => {
       const mentioned = quote.match(/\b20\d{2}\b/g) || [];
@@ -206,7 +206,10 @@ export async function readCandidates(entries, endpoint, signal) {
 
 // One bounded follow-up when the first documents leave a gap.
 export async function researchArticles(query, language, signal, search) {
-  const first = await search(query, language, signal);
+  // Remove request boilerplate before search; retain the original question for evidence.
+  const compact=query.replace(/\b(?:notizie|news|cerca|sulle|sugli|sulla|sul)\b/gi,' ').replace(/\s+/g,' ').trim();
+  const initial=compact || query;
+  const first = await search(initial, language, signal);
   const cards = evidenceCards(query, first);
   const text = cards.map(c=>c.quote).join(' ').toLowerCase();
   let missing = '';
