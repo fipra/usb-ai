@@ -121,6 +121,46 @@ export function renderEvidenceAnswer(raw, cards, language = 'en') {
 export function publicArticleURL(value) {
  try {const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&!/[\u0000-\u0020\\]/.test(value)&&/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,63}$/i.test(u.hostname)&&!/\.(?:local|localhost|internal|test|invalid|example|home|lan)$/i.test(u.hostname);}catch{return false;}
 }
+// Resolve opaque news links through links actually published on the publisher's page.
+// At most three public publisher pages; a title match is discovery, never evidence.
+export function publisherArticleLink(headline, links) {
+  const words = value => new Set((value.toLowerCase().normalize('NFKD').replace(/\p{M}/gu,'').match(/[\p{L}\p{N}]{4,}/gu)||[]));
+  const wanted=words(headline.title.split(' - ').slice(0,-1).join(' - ') || headline.title);
+  if(wanted.size<3)return null;
+  const publisher=new URL(headline.publisher);
+  const host=publisher.hostname.replace(/^www\./,'');
+  return links.flatMap(link=>{
+    try {
+      const url=new URL(link.href,publisher);
+      if(!publicArticleURL(url.href)||url.hostname.replace(/^www\./,'')!==host||url.pathname==='/')return [];
+      const present=words(link.text);const overlap=[...wanted].filter(w=>present.has(w)).length;
+      const score=overlap/wanted.size;
+      return overlap>=3&&score>=0.55?[{url:url.href,score}]:[];
+    }catch{return [];}
+  }).sort((a,b)=>b.score-a.score)[0]?.url || null;
+}
+export async function discoverPublisherArticles(headlines,endpoint,signal) {
+  const publishers=new Set();
+  const selected=headlines.filter(h=>{
+    if(!h.publisher||!publicArticleURL(h.publisher)||publishers.has(h.publisher))return false;
+    publishers.add(h.publisher);return true;
+  }).slice(0,3);
+  return (await Promise.all(selected.map(async headline=>{
+    const controller=new AbortController();const abort=()=>controller.abort(signal?.reason);
+    signal?.addEventListener('abort',abort,{once:true});const timer=setTimeout(()=>controller.abort(),9000);
+    try {
+      if(signal?.aborted)throw signal.reason;
+      const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:headline.publisher}),signal:controller.signal,credentials:'same-origin'});
+      if(!response.ok)return null;
+      const payload=await response.json();if(typeof payload.html!=='string'||payload.html.length>1048576)return null;
+      const doc=new DOMParser().parseFromString(payload.html,'text/html');
+      const links=Array.from(doc.querySelectorAll('a[href]')).map(a=>({href:a.getAttribute('href'),text:a.textContent+' '+(a.getAttribute('aria-label')||'')}));
+      const url=publisherArticleLink(headline,links);
+      return url?{...headline,url,discovered:true}:null;
+    }catch(error){if(signal?.aborted)throw error;return null;}
+    finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+  }))).filter(Boolean);
+}
 export const READABLE_PUBLISHERS = new Set(['www.bbc.com','www.bbc.co.uk','www.theguardian.com','www.ansa.it','tg24.sky.it','www.vaticannews.va','www.ilpost.it','apnews.com','www.reuters.com']);
 // Session-only bounded cache. It stores public article text, never chat or questions.
 export function createArticleCache(maxEntries=24, ttlMs=60000, clock=Date.now) {
