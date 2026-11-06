@@ -352,6 +352,38 @@ mod evidence_tests {
 }
 
 #[cfg(test)]
+mod device_reply_tests {
+    use super::*;
+    #[test]
+    fn device_reply_persists_and_edits_without_a_model_or_sources() {
+        let root = env::temp_dir().join(format!("llamanest-device-{}", id()));
+        fs::create_dir_all(&root).unwrap();
+        let mut app = App {
+            root: root.clone(), models: root.join("models"), db: Workspace::default(),
+            selected: None, catalog: model_catalog(), hardware: detect_hardware(),
+            downloading: None, download_error: None, inference: None, quantization: None,
+        };
+        let chat_id = app.command("new-chat", json!({})).unwrap()["id"].as_str().unwrap().to_owned();
+        let request = json!({"chatId":chat_id,"text":"che giorno è oggi","deviceReply":"Oggi è venerdì 6 novembre 2026.","webSources":[]});
+        app.command("send", request.clone()).unwrap();
+        assert_eq!(app.db.chats[0].messages.len(), 2);
+        assert_eq!(app.db.chats[0].messages[1].text, "Oggi è venerdì 6 novembre 2026.");
+        assert!(app.db.chats[0].messages[1].sources.is_empty());
+        assert!(app.db.chats[0].messages[1].usage.is_none());
+        let mut edited = request.clone(); edited["editIndex"] = json!(0); edited["text"] = json!("ciao"); edited["deviceReply"] = json!("Ciao! Come posso aiutarti?");
+        app.command("send", edited).unwrap();
+        assert_eq!(app.db.chats[0].messages.len(), 2);
+        assert_eq!(app.db.chats[0].messages[1].text, "Ciao! Come posso aiutarti?");
+        let mut invalid = request; invalid["deviceReply"] = json!("x".repeat(513));
+        assert!(app.command("send", invalid).is_err());
+        assert_eq!(app.db.chats[0].messages.len(), 2);
+        let saved = fs::read_to_string(root.join("workspace.json")).unwrap();
+        assert!(saved.contains("Ciao! Come posso aiutarti?"));
+        fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
 mod scope_tests {
     use super::*;
     fn source(text: &str) -> Source {
