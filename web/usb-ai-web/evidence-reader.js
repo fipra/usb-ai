@@ -1,5 +1,5 @@
 // Shared by browser and native experiments. Documents remain untrusted data.
-export const READER_VERSION = 'evidence-reader-2';
+export const READER_VERSION = 'evidence-reader-2.1';
 export function extractArticle(html) {
   const doc = new DOMParser().parseFromString(html.slice(0, 1048576), 'text/html');
   for (const element of doc.querySelectorAll('script,style,nav,header,footer,aside,form,iframe,noscript')) element.remove();
@@ -10,8 +10,20 @@ export function extractArticle(html) {
 }
 // Scope is part of relevance: a demographic majority is not control of a chamber.
 const normalizeEvidence = s => s.toLowerCase().normalize('NFKD').replace(/\p{M}/gu,'').replace(/\b(?:stati uniti|united states|usa|u\.s\.|us)\b/g,'usa').replace(/elezioni|elections|midterms/g,'election');
+export function percentageQuestion(question) { return /percentual|percentage|percent|pourcentage|prozent|porcentaje|%/i.test(question); }
+export function evidenceMissing(question, language='en') {
+  const messages={
+    en:'I searched within the previous topic, but the articles read do not provide relevant percentages. I cannot derive vote percentages from seat counts or voter-group polls.',
+    it:'Ho cercato nel contesto della domanda, ma gli articoli letti non riportano percentuali pertinenti. Non posso ricavare percentuali di voto dai seggi o dai sondaggi su gruppi di elettori.',
+    fr:'La recherche tient compte du contexte, mais les articles lus ne donnent pas de pourcentages pertinents. Les sièges et sondages de groupes ne permettent pas de déduire les pourcentages de voix.',
+    de:'Die Suche berücksichtigt den Kontext, aber die gelesenen Artikel enthalten keine passenden Prozentwerte. Sitzanzahlen und Umfragen zu Wählergruppen belegen keine Stimmenanteile.',
+    es:'La búsqueda tiene en cuenta el contexto, pero los artículos leídos no aportan porcentajes pertinentes. Los escaños y las encuestas de grupos no permiten deducir porcentajes de voto.'
+  };
+  if(percentageQuestion(question))return messages[language]||messages.en;
+  return ({en:'No relevant article text could be read.',it:'Non è stato possibile leggere articoli pertinenti.',fr:'Aucun article pertinent n’a pu être lu.',de:'Keine passenden Artikel lesbar.',es:'No se pudieron leer artículos pertinentes.'})[language]||'No relevant article text could be read.';
+}
 export function nationalOutcomeQuestion(question) {
-  return /elezion|election|midterm/i.test(question) && /vinto|vincitor|risultat|won|winner|results/i.test(question)
+  return !percentageQuestion(question) && /elezion|election|midterm/i.test(question) && /vinto|vincitor|risultat|won|winner|results/i.test(question)
     && /stati uniti|united states|\busa?\b|midterm|congress|senat|camera|house/i.test(question)
     && !/\b(?:Michigan|Texas|Ohio|Alaska|Mississippi|California|Florida|Arizona|Georgia|Pennsylvania|Wisconsin|Nevada|Iowa|Carolina|district|distretto|governor|governatore|sindaco|mayor|Jewish|ebrei)\b/i.test(question);
 }
@@ -27,6 +39,8 @@ export function evidenceCards(question, entries) {
   const terms = [...new Set(normalizeEvidence(question).match(/[\p{L}\p{N}]{3,}/gu) || [])].filter(t => !stop.has(t));
   const years = question.match(/\b20\d{2}\b/g) || [];
   const national = nationalOutcomeQuestion(question);
+  const percentage = percentageQuestion(question);
+  const electionPercent = percentage && /elezion|election|midterm/i.test(question);
   const candidates = [];
   entries.forEach((entry, source) => {
     if (entry.kind !== 'article' || !entry.description || entry.description.length < 200) return;
@@ -38,7 +52,9 @@ export function evidenceCards(question, entries) {
     passages.forEach((quote, order) => {
       const mentioned = quote.match(/\b20\d{2}\b/g) || [];
       if (years.length && mentioned.some(y => !years.includes(y))) return;
-      const direct = national && nationalOutcomePassage(quote);
+      if (percentage && !/\d+(?:[.,]\d+)?\s*(?:%|per cent|percent|per cento|pour cent|prozent|por ciento)/i.test(quote)) return;
+      if (electionPercent && (!/votes?|voti|voto|stimmen|voix|votos/i.test(quote) || /poll|sondagg|exit poll|survey|surveyed|Jewish voters|data cent|approval|affluenza|turnout/i.test(quote))) return;
+      const direct = (national && nationalOutcomePassage(quote)) || (percentage && /votes?|voti|voto|stimmen|voix|votos/i.test(quote));
       if (national && !direct) return;
       const overlap = terms.filter(t => normalizeEvidence(quote).includes(t)).length;
       if (!direct && !overlap) return;
@@ -133,6 +149,7 @@ export async function researchArticles(query, language, signal, search) {
   }
   const asksOutcome = /vinto|vincitor|risultat|won|winner|results/i.test(query);
   const hasOutcome = /\bwon\b|\bwins?\b|majorit|\bseats\b|vinto|vittori|maggioranza|\bseggi\b/i.test(text);
+  if (percentageQuestion(query) && !cards.length) missing += ' vote share percentage';
   if (nationalOutcomeQuestion(query) && !controlSummary(cards, language)) missing += ' House Senate control majority winner';
   if (cards.length && !missing && (!asksOutcome || hasOutcome)) return first;
   const alternate = query.replace(/chi ha vinto(?: le)?/gi,'winners').replace(/stati uniti/gi,'USA').replace(/elezioni/gi,'election').replace(/medio termine|metà mandato/gi,'midterm').replace(/risultati/gi,'results').replace(/novembre/gi,'November');
