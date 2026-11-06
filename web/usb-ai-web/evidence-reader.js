@@ -1,5 +1,5 @@
 // Shared by browser and native experiments. Documents remain untrusted data.
-export const READER_VERSION = 'evidence-reader-3.2.2';
+export const READER_VERSION = 'evidence-reader-3.2.3';
 export const NEWS_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 export function historicalNewsQuery(query, now=Date.now()) {
   const year=new Date(now).getFullYear();
