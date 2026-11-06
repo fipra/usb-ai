@@ -1,11 +1,12 @@
-function prepareNewsResults(results) {
+function prepareNewsResults(results, language='en') {
   const clean = value => value.replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
   return results.flatMap(result => {
     if (!result || typeof result.title !== 'string' || typeof result.url !== 'string' || typeof result.description !== 'string') return [];
     let url;
     try { url = new URL(result.url); } catch { return []; }
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return [];
-    const title = clean(result.title).slice(0, 150), description = clean(result.description).slice(0, 1800);
+    const date = sourceDateLabel(result.date, language);
+    const title = clean(result.title).slice(0, 150) + (date ? ` · ${date}` : ''), description = clean(result.description).slice(0, 1800);
     return title && description ? [{title, url:url.href, description}] : [];
   }).slice(0, 3);
 }
@@ -18,7 +19,7 @@ function newsMatchScore(query, entry) {
   return terms.length > 1 && matches < 2 ? 0 : matches;
 }
 // Google News returns headlines, not the full articles. Treat them accordingly.
-async function searchNewsOnce(query, language, signal) {
+async function searchNewsOnce(query, language, signal, fresh=false) {
   const discovery = fetch('/article-discovery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query}),signal}).then(r=>r.ok?r.json():{}).catch(()=>({}));
   const request = fetch('/news-search', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -56,11 +57,13 @@ async function searchNewsOnce(query, language, signal) {
   for (const item of Array.isArray(payload.results) ? payload.results.slice(0,10) : []) {
     if (typeof item.title === 'string' && typeof item.url === 'string') entries.push({discovered:true,title:item.title,url:item.url,description:typeof item.description === 'string' ? item.description : ''});
   }
-  const resolved = await discoverPublisherArticles(entries.filter(e=>e.publisher), '/read-article', signal);
-  entries.unshift(...resolved);
-  const ranked = entries.map((entry, i) => ({entry, i, score:newsMatchScore(query, entry)})).sort((a,b) => b.score-a.score || Number(b.entry.description.startsWith('RSS summary;')) - Number(a.entry.description.startsWith('RSS summary;')) || a.i-b.i);
+  const recent = entries.filter(e=>historicalNewsQuery(query) || (!(e.publisher || e.description.startsWith('RSS summary;')) || isRecentNewsDate(e.date)));
+  const resolved = await discoverPublisherArticles(recent.filter(e=>e.publisher), '/read-article', signal);
+  recent.unshift(...resolved);
+  const ranked = recent.map((entry, i) => ({entry, i, score:newsMatchScore(query, entry)})).sort((a,b) => b.score-a.score || Number(b.entry.description.startsWith('RSS summary;')) - Number(a.entry.description.startsWith('RSS summary;')) || a.i-b.i);
   const selected = ranked.filter(x => (x.score > 0 || x.entry.discovered) && !x.entry.url.includes('news.google.com')).map(x => x.entry);
-  return readCandidates(selected, '/read-article', signal);
+  const articles = await readCandidates(selected, '/read-article', signal);
+  return fresh ? articles.filter(entry=>isRecentNewsDate(entry.date)) : articles;
 }
 
 const newsStrings = {
