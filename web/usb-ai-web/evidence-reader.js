@@ -1,5 +1,5 @@
 // Shared by browser and native experiments. Documents remain untrusted data.
-export const READER_VERSION = 'evidence-reader-2.1';
+export const READER_VERSION = 'evidence-reader-2.2';
 export function extractArticle(html) {
   const doc = new DOMParser().parseFromString(html.slice(0, 1048576), 'text/html');
   for (const element of doc.querySelectorAll('script,style,nav,header,footer,aside,form,iframe,noscript')) element.remove();
@@ -119,23 +119,46 @@ export function renderEvidenceAnswer(raw, cards, language = 'en') {
   return selected.length ? label[0] + '\n\n' + selected.map(c => `“${c.quote}” [${c.source}]`).join('\n\n') : label[1];
 }
 export const READABLE_PUBLISHERS = new Set(['www.bbc.com','www.bbc.co.uk','www.theguardian.com','www.ansa.it','tg24.sky.it','www.vaticannews.va','www.ilpost.it','apnews.com','www.reuters.com']);
+// Session-only bounded cache. It stores public article text, never chat or questions.
+export function createArticleCache(maxEntries=24, ttlMs=60000, clock=Date.now) {
+  const values=new Map();
+  return {
+    get(key) { const item=values.get(key); if(!item)return null; if(clock()-item.at>=ttlMs){values.delete(key);return null;} values.delete(key);values.set(key,item);return {...item.value}; },
+    put(key,value) { values.delete(key);values.set(key,{at:clock(),value:{...value}});while(values.size>maxEntries)values.delete(values.keys().next().value); },
+    get size(){return values.size;}
+  };
+}
+const articleCache=createArticleCache();
 export async function readCandidates(entries, endpoint, signal) {
   const seen = new Set();
   const candidates = entries.filter(entry => {
     try { const url = new URL(entry.url); url.hash=''; if (url.protocol !== 'https:' || url.username || url.password || url.port || !READABLE_PUBLISHERS.has(url.hostname) || seen.has(url.href)) return false; seen.add(url.href); return true; } catch { return false; }
-  });
-  return (await Promise.all(candidates.slice(0,6).map(async entry => {
-    try {
-      const response = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:entry.url}),signal});
-      if (!response.ok) return null;
-      const payload = await response.json();
-      const html = payload.html || '';
-      const description = extractArticle(html);
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      const published = doc.querySelector('meta[property="article:published_time"],meta[name="date"]')?.getAttribute('content') || entry.date || '';
-      return description.length >= 200 ? {...entry,description,date:published,kind:'article'} : null;
-    } catch (error) { if (signal?.aborted) throw error; return null; }
-  }))).filter(Boolean);
+  }).slice(0,6);
+  const results=new Array(candidates.length);let cursor=0;
+  const worker=async()=>{
+    while(cursor<candidates.length){
+      const index=cursor++;const entry=candidates[index];
+      if(signal?.aborted)throw signal.reason || new DOMException('Aborted','AbortError');
+      const key=endpoint+' '+new URL(entry.url).href.split('#')[0];
+      const cached=articleCache.get(key);
+      if(cached){results[index]={...entry,...cached};continue;}
+      const controller=new AbortController();const abort=()=>controller.abort(signal?.reason);
+      signal?.addEventListener('abort',abort,{once:true});const timer=setTimeout(()=>controller.abort(),9000);
+      try {
+        const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:entry.url}),signal:controller.signal,credentials:'same-origin'});
+        if(!response.ok)continue;
+        const payload=await response.json();
+        if(typeof payload.html!=='string'||payload.html.length>1048576)continue;
+        const description=extractArticle(payload.html);
+        const doc=new DOMParser().parseFromString(payload.html,'text/html');
+        const date=doc.querySelector('meta[property="article:published_time"],meta[name="date"]')?.getAttribute('content') || entry.date || '';
+        if(description.length>=200){const article={description,date,kind:'article',readAt:new Date().toISOString()};articleCache.put(key,article);results[index]={...entry,...article};}
+      } catch(error){if(signal?.aborted)throw error;}
+      finally {clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+    }
+  };
+  await Promise.all(Array.from({length:Math.min(3,candidates.length)},worker));
+  return results.filter(Boolean);
 }
 
 // One bounded follow-up when the first documents leave a gap.
@@ -158,6 +181,9 @@ export async function researchArticles(query, language, signal, search) {
   try {
     const second = await search(followup, language, signal);
     const unique = new Map([...first,...second].map(entry=>[entry.url,entry]));
-    return [...unique.values()].slice(0,6);
+    const merged=[...unique.values()];
+    // A second search must be able to replace an irrelevant first batch.
+    const useful=new Set(evidenceCards(query,merged).map(card=>card.source-1));
+    return merged.map((entry,index)=>({entry,index})).sort((a,b)=>Number(useful.has(b.index))-Number(useful.has(a.index))).slice(0,6).map(x=>x.entry);
   } catch(error) { if(signal?.aborted) throw error; return first; }
 }
