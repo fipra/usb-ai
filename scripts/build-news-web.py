@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
     (work / 'node_modules').symlink_to(web / 'node_modules', target_is_directory=True)
     app = work / 'usb-ai-web'
     main = app / 'main.js'
-    replace(main, "import './style.css';", "import './style.css';\nimport { evidenceCards, evidencePrompt, renderEvidenceAnswer } from './evidence-reader.js';\nimport { webSearchQuery } from './web-search.js';\nimport { searchGoogleNews, newsQuestion, prepareNewsResults } from './news-search.js';")
+    replace(main, "import './style.css';", "import './style.css';\nimport { evidenceCards, evidencePrompt, renderEvidenceAnswer, evidenceMissing } from './evidence-reader.js';\nimport { webSearchQuery } from './web-search.js';\nimport { searchGoogleNews, newsQuestion, prepareNewsResults } from './news-search.js';")
     replace(main, 'let thinking = false, semanticEnabled = false;', 'let thinking = false, semanticEnabled = false;\nlet webSearchEnabled = false;')
     replace(main, "$('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');", "renderWebSearch(); $('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');")
     replace(main, "  $('semantic-toggle').disabled = value;", "  $('semantic-toggle').disabled = value;\n  $('web-search-toggle').disabled = value;")
@@ -37,11 +37,11 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
       if (!entries.length) throw Error(tr('webSearchEmpty'));
       answer.sources = [];
       answer.webSources = entries;
-      answer.evidenceCards = evidenceCards(text, entries);
-      if (!answer.evidenceCards.length) throw Error(tr('webSearchEmpty'));
+      answer.evidenceCards = evidenceCards(searchQuery, entries);
+      if (!answer.evidenceCards.length) throw Error(evidenceMissing(searchQuery, language));
       for (const context of contexts) {
         // Evidence selection is independent of unrelated chat history.
-        context.splice(0, context.length, {role:'user', content:evidencePrompt(text, answer.evidenceCards)});
+        context.splice(0, context.length, {role:'user', content:evidencePrompt(searchQuery, answer.evidenceCards)});
       }
     }
     if (!isRemote(selectedId)) {
