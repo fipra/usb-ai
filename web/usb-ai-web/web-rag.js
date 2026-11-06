@@ -235,7 +235,7 @@ export function answerPrompt(question, sources, today = '', language = 'en') {
     system: [
       `Today is ${today || 'unknown'}. You are LlamaNest, a friendly assistant chatting with the user. For this message you looked things up on the web; the pages you read are below.`,
       'How to reply:',
-      '- Talk naturally, like in a conversation: answer the question directly in a few sentences, warm and clear. No headings, no reports.',
+      '- Talk naturally, like in a conversation: answer the question directly, warm and clear. Keep it short (2-4 sentences) unless the user asks for details. No headings, no reports.',
       '- Use the earlier messages to understand what the user means (for example who "he" or "she" is).',
       '- Use only facts written in the pages below. Add the source number after each fact, like [1] or [2].',
       '- Never invent facts, opinions, links or web addresses. Do not judge people; report what the sources say.',
@@ -270,9 +270,10 @@ export function verifyAnswer(answer, sources, question = '', today = '', context
   const unsupported = [];
   let cited = 0, factual = 0;
   const questionNumbers = new Set([...(question.match(NUMBER) || []), ...(String(today).match(/\d+/g) || [])].map(normNumber));
-  // Simple calculations from source years (ages, durations) are allowed.
+  // Ages and elapsed years computed from today's date are allowed.
   const years = [...new Set([...sources.map(s => s.text).join(' ').matchAll(/\b(1[89]\d{2}|20\d{2})\b/g)].map(m => Number(m[1])).concat(String(today).match(/\b20\d{2}\b/g)?.map(Number) || []))];
-  for (const a of years) for (const b of years) if (a > b && a - b <= 150) { questionNumbers.add(String(a - b)); questionNumbers.add(String(a - b - 1)); }
+  const now = Number((String(today).match(/\b20\d{2}\b/) || [])[0]);
+  if (now) for (const b of years) if (now > b && now - b <= 150) { questionNumbers.add(String(now - b)); questionNumbers.add(String(now - b - 1)); }
   for (const sentence of sentences) {
     const refs = [...sentence.matchAll(/\[(\d{1,2})\]/g)].map(m => Number(m[1]));
     const bare = sentence.replace(/\[\d{1,2}\]/g, '');
@@ -289,14 +290,20 @@ export function verifyAnswer(answer, sources, question = '', today = '', context
   // sources, the question or the user's earlier messages.
   const known = (sources.map(s => s.title + ' ' + (s.url || '') + ' ' + s.text).join(' ') + ' ' + question + ' ' + context).toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '');
   const names = [];
+  const norm = w => w.toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '');
   for (const sentence of sentences) {
-    const words = sentence.replace(/\[\d{1,2}\]/g, '').split(/\s+/).slice(1);
-    for (const raw of words) {
+    const words = sentence.replace(/\[\d{1,2}\]/g, '').split(/\s+/);
+    let phrase = [], unknown = false;
+    const flush = () => { const text = phrase.join(' '); if (unknown && text && !names.includes(text)) names.push(text); phrase = []; unknown = false; };
+    words.forEach((raw, index) => {
       const word = raw.split(/['’]/).pop().replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
-      if (!/^\p{Lu}[\p{L}-]{3,}$/u.test(word) || /^\p{Lu}+$/u.test(word)) continue;
-      const key = word.toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '');
-      if (!known.includes(key) && !names.includes(word)) names.push(word);
-    }
+      const capital = index > 0 && /^\p{Lu}[\p{L}-]{2,}$/u.test(word) && !/^\p{Lu}+$/u.test(word);
+      if (!capital) { flush(); return; }
+      phrase.push(word);
+      if (word.length >= 4 && !known.includes(norm(word))) unknown = true;
+      if (/[^\p{L}]$/u.test(raw)) flush();
+    });
+    flush();
   }
   return {
     invalidCitations: [...invalidCitations],

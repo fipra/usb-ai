@@ -102,6 +102,9 @@ test('follow-ups inherit the subject; invented names are flagged', async () => {
   const sources = [{source: 1, title: 'Giorgia Meloni', url: 'https://it.wikipedia.org/wiki/Giorgia_Meloni', text: 'Giorgia Meloni si è diplomata all\'Istituto Amerigo Vespucci di Roma.'}];
   const bad = finalizeAnswer('Giorgia Meloni ha studiato all\'Università di Firenze, Giurisprudenza.', sources, 'dove ha studiato', 'it', '2026-11-06', 'chi è giorgia meloni');
   assert.match(bad.text, /nomi non sono nelle fonti: Università, Firenze, Giurisprudenza/);
+  const party = finalizeAnswer('Ha lavorato per il Partito Socialista Italiano. Ha 47 anni.', sources, 'quanti anni ha', 'it', '2026-11-06', 'chi è giorgia meloni');
+  assert.match(party.text, /Partito Socialista Italiano/);
+  assert.match(party.text, /numeri non sono nelle fonti: 47/);
   const good = finalizeAnswer('Si è diplomata all\'Istituto Amerigo Vespucci di Roma [1].', sources, 'dove ha studiato', 'it', '2026-11-06');
   assert.doesNotMatch(good.text, /⚠️/);
 });
