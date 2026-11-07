@@ -26,6 +26,20 @@ def replace(path, old, new):
     path.write_text(data.replace(old, new, 1))
 
 rust = dest / 'src/main.rs'
+replace(rust, '        let edit_index = match data.get("editIndex") {', '''        if let Some(plan) = data.get("researchPlan").and_then(Value::as_str) {
+            if plan.len() > 24000 { return Err("Research context too long".into()); }
+            let model = self.selected.as_ref().ok_or("Seleziona un modello")?;
+            let path = self.model_path(model)?;
+            let previous = (self.db.output_limit, self.db.temperature, self.db.thinking);
+            self.db.output_limit = 256;
+            self.db.temperature = Some(0.0);
+            self.db.thinking = false;
+            let messages = conversation_messages("Interpret the latest request in its conversation. Follow the requested output format exactly. Resolve references from the conversation.", &[], plan, 0);
+            let result = self.infer_stream(&path, plan, Some(plan), Some(&messages), update, generation);
+            (self.db.output_limit, self.db.temperature, self.db.thinking) = previous;
+            return result.map(|(answer, _)| json!({"researchPlan": answer}));
+        }
+        let edit_index = match data.get("editIndex") {''')
 replace(rust, '        let sources = if use_docs {', '        let mut sources = if use_docs {')
 replace(rust, '        let direct_notes = if use_docs {', '''        let mut web_sources: Vec<Source> = Vec::new();
         if let Some(items) = data.get("webSources").and_then(Value::as_array) {
@@ -63,13 +77,23 @@ ui = (helpers / 'scripts/mac-web-search-ui.js').read_text()
 replace(html, '    function newRequestId(){', js + '\n' + strings + '\n' + ui + '\n    function newRequestId(){')
 replace(html, "function render(){if(!state)return;translateStatic();", "function render(){if(!state)return;translateStatic();renderWebSearch();")
 replace(html, "const chatId=active,requestId=activeRequestId,chat=state.chats.find(item=>item.id===chatId);", "const chatId=active,requestId=activeRequestId,chat=state.chats.find(item=>item.id===chatId);const webHistory=edit?chat.messages.slice(0,edit.index):chat.messages.slice();")
-replace(html, "try{state=await callStream({chatId,requestId,text,documents:true,editIndex:edit?.index},", "try{let webSources=[];if(webSearchEnabled){if(text.length>600||text.trim().split(/\\s+/).length>75)throw Error(tr('webSearchLong'));showWait(tr('webSearchSearching'));webSearchController=new AbortController();try{webSources=await searchWeb(webSearchQuery(text,webHistory),webSearchController.signal)}catch(error){if(error.name==='AbortError')throw error;throw Error(error.message==='WEB_SEARCH_LIMIT'?tr('webSearchLimit'):tr('webSearchError'))}finally{webSearchController=null}if(!webSources.length)throw Error(tr('webSearchEmpty'))}state=await callStream({chatId,requestId,text,webSources,documents:true,editIndex:edit?.index},")
-replace(html, "$('stop').onclick=()=>run(async()=>{if(!busy||!activeRequestId)return;", "$('stop').onclick=()=>run(async()=>{if(webSearchController){webSearchController.abort();return}if(!busy||!activeRequestId)return;")
+replace(html, "try{state=await callStream({chatId,requestId,text,documents:true,editIndex:edit?.index},", """try{let webSources=[],webPrompt='',webMessages=[],webNeedsEvidence=false;if(webSearchEnabled){showWait(tr('webSearchUnderstanding'));webSearchController=new AbortController();try{const turn=await resolveWebTurn(text,webHistory,async prompt=>{const result=await callStream({chatId,requestId,text,researchPlan:prompt},()=>{});showWait(tr('webSearchSearching'));return result.researchPlan},webSearchController.signal);webSources=turn.sources;webNeedsEvidence=turn.action==='search';if(webSources.length){webPrompt=groundedWebTurn(text,turn,webHistory);webMessages=webAnswerMessages(text,turn,webHistory)}}catch(error){if(error.name==='AbortError')throw error;throw Error(tr(error.message==='WEB_CONTEXT_UNCLEAR'?'webSearchClarify':error.message==='WEB_SEARCH_EMPTY'?'webSearchEmpty':error.message==='WEB_SEARCH_LIMIT'?'webSearchLimit':'webSearchError'))}finally{webSearchController=null}}state=await callStream({chatId,requestId,text,webSources,webPrompt,webMessages,webNeedsEvidence,webUnverified:tr('webSearchUnverified'),documents:true,editIndex:edit?.index},""")
+
+replace(html, "$('stop').onclick=()=>run(async()=>{if(!busy||!activeRequestId)return;", "$('stop').onclick=()=>run(async()=>{if(webSearchController){webSearchController.abort()}if(!busy||!activeRequestId)return;")
 replace(html, "details.append(el('summary',`[${index+1}] ${source.name}${source.page?' · '+tr('page')+' '+source.page:''}`),el('div',source.text));content.append(details)", "details.append(el('summary',`[${index+1}] ${source.name}${source.page?' · '+tr('page')+' '+source.page:''}`),el('div',source.text));if(source.docId?.startsWith('web:')){try{const url=new URL(source.docId.slice(4));if(['http:','https:'].includes(url.protocol)){const link=el('a',tr('source'));link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';details.append(link)}}catch{}}content.append(details)")
-# Keep web answers independent of earlier unsupported model claims and UI language.
-replace(rust, '        let (answer, usage) = if !direct_notes.is_empty() {', '''        let prompt = if web_sources.is_empty() { prompt } else { format!("{web_context}\\nUser question: {text}\\nAssistant:") };
-        let messages = if web_sources.is_empty() { messages } else { conversation_messages(&web_context, &[], text, 0) };
+# Use the same resolved request, history and evidence prompt as the browser.
+replace(rust, '        let (answer, usage) = if !direct_notes.is_empty() {', '''        let web_prompt = data.get("webPrompt").and_then(Value::as_str).unwrap_or("");
+        if web_prompt.len() > 48000 { return Err("Research context too long".into()); }
+        let prompt = if web_sources.is_empty() { prompt } else { web_prompt.to_owned() };
+        let messages = if web_sources.is_empty() { messages } else {
+            let items = data["webMessages"].as_array().ok_or("Missing research conversation")?;
+            if items.len() > 10 || items.iter().any(|m| !matches!(m["role"].as_str(), Some("user" | "assistant" | "system")) || m["content"].as_str().is_none_or(|s| s.len() > 32000)) { return Err("Invalid research conversation".into()); }
+            data["webMessages"].clone()
+        };
         let (answer, usage) = if web_sources.is_empty() && !direct_notes.is_empty() {''')
 # Source numbers in a web answer refer only to the web passages supplied for that turn.
-replace(rust, '        sources.extend(web_sources);', '        if !web_sources.is_empty() { sources = web_sources; }')
+replace(rust, '        sources.extend(web_sources);', '''        let answer = if !generation.cancelled.load(Ordering::SeqCst) && data["webNeedsEvidence"].as_bool() == Some(true) && !web_research::has_citation(&answer, web_sources.len()) {
+            data["webUnverified"].as_str().filter(|s| s.len() <= 1000).unwrap_or("I could not verify this answer from the available sources.").to_owned()
+        } else { answer };
+        if !web_sources.is_empty() { sources = web_sources; }''')
 print(dest)

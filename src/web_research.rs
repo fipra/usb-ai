@@ -142,8 +142,27 @@ pub fn read_article(data: &Value) -> Result<Vec<u8>, String> {
     }
     Err("Too many redirects".into())
 }
+pub fn has_citation(answer: &str, source_count: usize) -> bool {
+    answer.trim().len() > 15
+        && (1..=source_count.min(3)).any(|i| answer.contains(&format!("[{i}]")))
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn confirmation_requires_an_available_source_citation() {
+        assert!(!super::has_citation("Sì.", 3));
+        assert!(!super::has_citation("Sì, sono sicuro. [4]", 3));
+        assert!(super::has_citation(
+            "Il dato è indicato nella classifica datata. [1]",
+            1
+        ));
+        assert!(!super::has_citation(
+            "Il dato è indicato nella classifica datata. [1]",
+            0
+        ));
+    }
+
     use super::*;
     #[test]
     fn rejects_local_urls_before_network() {

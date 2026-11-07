@@ -66,5 +66,13 @@ for (const [lang, values] of Object.entries({
  es:{webSearchPrivacy:'El modelo puede enviar a Purili una búsqueda basada en la pregunta y la conversación. Purili puede ver tu dirección IP.',webSearchSearching:'El modelo decide si busca…'}
 })) Object.assign(window.USB_AI_I18N[lang], values);
     function newRequestId(){''')
-replace(html, '''if(text.length>600||text.trim().split(/\\s+/).length>75)throw Error(tr('webSearchLong'));showWait(tr('webSearchSearching'));webSearchController=new AbortController();try{webSources=await searchWeb(webSearchQuery(text,webHistory),webSearchController.signal)}catch(error){if(error.name==='AbortError')throw error;throw Error(error.message==='WEB_SEARCH_LIMIT'?tr('webSearchLimit'):tr('webSearchError'))}finally{webSearchController=null}if(!webSources.length)throw Error(tr('webSearchEmpty'))''', '''showWait(tr('webSearchSearching'));const plan=await callStream({chatId,requestId,text,editIndex:edit?.index,agentPlan:true},()=>{});const query=agentWebQuery(plan.output);if(/<use_mcp_tool>/i.test(plan.output)&&!query)throw Error('Invalid or unsupported search request from model');if(query){webSearchController=new AbortController();try{webSources=await searchWeb(query,webSearchController.signal)}catch(error){if(error.name==='AbortError')throw error;throw Error(error.message==='WEB_SEARCH_LIMIT'?tr('webSearchLimit'):tr('webSearchError'))}finally{webSearchController=null}if(!webSources.length)throw Error(tr('webSearchEmpty'))}''')
+# Replace the shared local planner with this experiment's tool-call planner.
+start = "showWait(tr('webSearchUnderstanding'));webSearchController=new AbortController();"
+end = "finally{webSearchController=null}"
+page = html.read_text()
+a = page.index(start)
+b = page.index(end, a) + len(end)
+page = page[:a] + """showWait(tr('webSearchSearching'));const plan=await callStream({chatId,requestId,text,editIndex:edit?.index,agentPlan:true},()=>{});const query=agentWebQuery(plan.output);if(/<use_mcp_tool>/i.test(plan.output)&&!query)throw Error('Invalid or unsupported search request from model');if(query){webSearchController=new AbortController();try{webSources=await searchWeb(query,webSearchController.signal)}catch(error){if(error.name==='AbortError')throw error;throw Error(error.message==='WEB_SEARCH_LIMIT'?tr('webSearchLimit'):tr('webSearchError'))}finally{webSearchController=null}if(!webSources.length)throw Error(tr('webSearchEmpty'));webNeedsEvidence=true;webPrompt=groundedWebTurn(text,{question:query,sources:webSources,action:'search',verify:false},webHistory);webMessages=webAnswerMessages(text,{question:query,sources:webSources,action:'search',verify:false},webHistory)}""" + page[b:]
+html.write_text(page)
+
 print(root)
