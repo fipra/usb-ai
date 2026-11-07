@@ -5,7 +5,7 @@ WORK=$(mktemp -d "${TMPDIR:-/tmp}/llamanest-mac-web-rag.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
 python3 "$ROOT/scripts/prepare-mac-rag.py" "$WORK/source"
 (cd "$WORK/source" && cargo test --locked && python3 scripts/package-mac.py)
-PACKAGE="$ROOT/release/LlamaNest-Ricerca-Web-v4-Mac-Apple-Silicon"
+PACKAGE="$ROOT/release/LlamaNest-Ricerca-Web-v4.1-Mac-Apple-Silicon"
 if [ -e "$PACKAGE" ]; then
   echo "Output already exists: $PACKAGE" >&2
   exit 1
@@ -31,13 +31,15 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 (p / 'Avvia LlamaNest LAN.command').unlink(missing_ok=True)
-(p / 'LEGGIMI.txt').write_text('''LlamaNest Ricerca Web v4 — versione sperimentale per Mac Apple Silicon
+(p / 'LEGGIMI.txt').write_text('''LlamaNest Ricerca Web v4.1 — versione sperimentale per Mac Apple Silicon
 
 Apri Avvia LlamaNest.command e seleziona un modello GGUF (consigliato: 3-4B instruct, ad esempio Qwen3 4B o Llama 3.2 3B).
 Per Bonsai PQ2_0 apri Modelli, scegli Motore del modello → PrismML (Bonsai), quindi carica il GGUF.
 Premi Web spento per attivare la ricerca. Non servono carta, account o chiave API.
 
-Come funziona la v4:
+Novità della v4.1: risposte brevi e conversazionali che ricordano gli ultimi messaggi; ricerca solo quando serve (non per scrivere, tradurre, correggere, calcolare o programmare); con un documento caricato la ricerca web si spegne; ricerca e lettura delle pagine in parallelo, con un tempo massimo di lettura; segnalati numeri e nomi assenti dalle fonti.
+
+Come funziona:
 1. il modello locale trasforma la domanda (e il contesto delle domande precedenti) in 2-3 ricerche;
 2. le ricerche vanno a Purili e Wikipedia;
 3. il Mac legge direttamente le pagine trovate (i siti vedono il tuo indirizzo IP);

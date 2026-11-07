@@ -1,8 +1,7 @@
 // Web RAG v4 (experimental). Appended to src/main.rs by prepare-mac-rag.py.
 const WEB_PLAN_MARKER: &str = "LLAMANEST_WEB_RAG_PLAN";
-// Must match PLAN_GRAMMAR in web/usb-ai-web/web-rag.js.
-const WEB_PLAN_GRAMMAR: &str = r#"root ::= "{\"queries\":[" q ("," q){0,2} "],\"recent\":" ("true" | "false") "}"
-q ::= "\"" c{3,90} "\""
+// Must match ENGLISH_QUERY_GRAMMAR in web/usb-ai-web/web-rag.js.
+const WEB_PLAN_GRAMMAR: &str = r#"root ::= "{\"q\":\"" c{3,80} "\"}"
 c ::= [^"\\\x00-\x1f]"#;
 
 fn constrain_web_plan(prompt: &str, body: &mut Value) {
@@ -11,7 +10,7 @@ fn constrain_web_plan(prompt: &str, body: &mut Value) {
     }
     body["grammar"] = json!(WEB_PLAN_GRAMMAR);
     body["temperature"] = json!(0);
-    body["n_predict"] = json!(160);
+    body["n_predict"] = json!(40);
 }
 
 // Wikipedia search: fixed hosts, five languages, bounded query.
@@ -122,20 +121,107 @@ fn strip_citations(text: &str) -> (String, Vec<usize>) {
     (clean, refs)
 }
 
-// Generic answer check: invalid citations are removed; numbers absent from all
-// sources (and from the question) and missing citations are flagged.
-fn verify_web_answer(answer: &str, sources: &[Source], question: &str, lang: &str) -> String {
-    let visible = final_answer_only(answer);
+fn web_host(url: &str) -> String {
+    url.trim_start_matches("web:")
+        .split("://")
+        .nth(1)
+        .unwrap_or("")
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or("")
+        .trim_start_matches("www.")
+        .to_lowercase()
+}
+
+// Lines with links to hosts that are not among the sources are removed.
+fn remove_invented_links(text: &str, sources: &[Source]) -> String {
+    let hosts: Vec<String> = sources.iter().map(|s| web_host(&s.doc_id)).collect();
+    text.lines()
+        .filter(|line| {
+            line.split_whitespace()
+                .filter(|w| w.contains("http://") || w.contains("https://"))
+                .all(|w| {
+                    let url = &w[w.find("http").unwrap_or(0)..];
+                    let host = web_host(url.trim_end_matches(|c: char| ")]>\"'.,".contains(c)));
+                    !host.is_empty() && hosts.contains(&host)
+                })
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+// Capitalised words inside a sentence that appear nowhere in the sources,
+// the question or the user's earlier messages, grouped into phrases.
+fn unsupported_names(text: &str, known: &str) -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    for sentence in text.split(|c| c == '.' || c == '!' || c == '?' || c == '\n') {
+        let words: Vec<&str> = sentence.split_whitespace().collect();
+        let first = words.iter().position(|w| w.chars().any(char::is_alphabetic));
+        let mut phrase: Vec<String> = Vec::new();
+        let mut unknown = false;
+        let mut flush = |phrase: &mut Vec<String>, unknown: &mut bool, names: &mut Vec<String>| {
+            let joined = phrase.join(" ");
+            if *unknown && !joined.is_empty() && !names.contains(&joined) {
+                names.push(joined);
+            }
+            phrase.clear();
+            *unknown = false;
+        };
+        for (index, raw) in words.iter().enumerate() {
+            let tail = raw.rsplit(['\'', '’']).next().unwrap_or(raw);
+            let word: String = tail.trim_matches(|c: char| !c.is_alphabetic()).to_owned();
+            let label = raw.trim_end_matches('*').ends_with(':');
+            let mut chars = word.chars();
+            let capital = Some(index) > first
+                && !label
+                && word.chars().count() >= 3
+                && chars.next().is_some_and(char::is_uppercase)
+                && word.chars().all(|c| c.is_alphabetic() || c == '-')
+                && !word.chars().all(char::is_uppercase);
+            if !capital {
+                flush(&mut phrase, &mut unknown, &mut names);
+                continue;
+            }
+            if word.chars().count() >= 4 && !known.contains(&word.to_lowercase()) {
+                unknown = true;
+            }
+            phrase.push(word);
+            if raw.ends_with(|c: char| !c.is_alphabetic()) {
+                flush(&mut phrase, &mut unknown, &mut names);
+            }
+        }
+        flush(&mut phrase, &mut unknown, &mut names);
+    }
+    names
+}
+
+// Generic answer check, same rules as finalizeAnswer in web-rag.js: invalid
+// citations and invented links are removed; numbers and names missing from
+// the sources are flagged; ages computed from today's year are accepted.
+fn verify_web_answer(answer: &str, sources: &[Source], question: &str, lang: &str, today: &str, user_text: &str, all_text: &str) -> String {
+    let mut text = remove_invented_links(answer.trim(), sources);
+    let visible = final_answer_only(&text);
     let (bare, refs) = strip_citations(&visible);
-    let mut text = answer.trim().to_owned();
     for r in refs.iter().filter(|r| **r == 0 || **r > sources.len()) {
         text = text.replace(&format!("[{r}]"), "");
     }
-    let known: std::collections::HashSet<String> = sources
-        .iter()
-        .flat_map(|s| web_numbers(&format!("{} {}", s.name, s.text)))
+    let source_text = sources.iter().map(|s| format!("{} {} {}", s.name, s.doc_id, s.text)).collect::<Vec<_>>().join(" ");
+    let mut known: std::collections::HashSet<String> = web_numbers(&source_text)
+        .into_iter()
         .chain(web_numbers(question))
+        .chain(web_numbers(today))
         .collect();
+    let now: i64 = today.get(..4).and_then(|y| y.parse().ok()).unwrap_or(0);
+    if now > 0 {
+        for n in web_numbers(&format!("{source_text} {all_text}")) {
+            if let Ok(year) = n.parse::<i64>() {
+                if (1800..now).contains(&year) && now - year <= 150 {
+                    known.insert((now - year).to_string());
+                    known.insert((now - year - 1).to_string());
+                }
+            }
+        }
+    }
     let mut unsupported: Vec<String> = Vec::new();
     for n in web_numbers(&bare) {
         let trimmed = n.trim_end_matches(".0").to_owned();
@@ -143,21 +229,21 @@ fn verify_web_answer(answer: &str, sources: &[Source], question: &str, lang: &st
             unsupported.push(n);
         }
     }
-    let valid_refs = refs.iter().any(|r| *r >= 1 && *r <= sources.len());
+    let names = unsupported_names(&bare, &format!("{source_text} {question} {user_text}").to_lowercase());
     let words = match lang {
-        "it" => ["Verifica:", "questi numeri non compaiono nelle fonti", "la risposta non cita le fonti"],
-        "fr" => ["Vérification :", "ces nombres n’apparaissent pas dans les sources", "la réponse ne cite aucune source"],
-        "de" => ["Prüfung:", "diese Zahlen stehen nicht in den Quellen", "die Antwort nennt keine Quellen"],
-        "es" => ["Verificación:", "estos números no aparecen en las fuentes", "la respuesta no cita fuentes"],
-        _ => ["Check:", "these numbers do not appear in the sources", "the answer has no source citations"],
+        "it" => ["Da verificare:", "questi numeri non sono nelle fonti", "questi nomi non sono nelle fonti"],
+        "fr" => ["À vérifier :", "ces nombres ne figurent pas dans les sources", "ces noms ne figurent pas dans les sources"],
+        "de" => ["Bitte prüfen:", "diese Zahlen stehen nicht in den Quellen", "diese Namen stehen nicht in den Quellen"],
+        "es" => ["Por verificar:", "estos números no están en las fuentes", "estos nombres no están en las fuentes"],
+        _ => ["To check:", "these numbers are not in the sources", "these names are not in the sources"],
     };
     let mut notes = Vec::new();
     if !unsupported.is_empty() {
         unsupported.truncate(6);
         notes.push(format!("{}: {}", words[1], unsupported.join(", ")));
     }
-    if !valid_refs {
-        notes.push(words[2].to_owned());
+    if !names.is_empty() {
+        notes.push(format!("{}: {}", words[2], names.iter().take(6).cloned().collect::<Vec<_>>().join(", ")));
     }
     if !notes.is_empty() {
         text.push_str(&format!("\n\n> ⚠️ {} {}.", words[0], notes.join("; ")));
@@ -176,15 +262,27 @@ mod web_rag_tests {
         assert_eq!(web_numbers("4,478 m and 4.478 m, 3,5% in 2025."), vec!["4478", "4478", "3.5", "2025"]);
     }
     #[test]
-    fn flags_invented_numbers_and_removes_unknown_citations() {
+    fn flags_invented_numbers_and_names_and_removes_unknown_citations() {
         let sources = vec![source("The Matterhorn is 4,478 metres high.")];
-        let ok = verify_web_answer("Il Cervino è alto 4.478 metri [1].", &sources, "Quanto è alto il Cervino?", "it");
-        assert!(!ok.contains("⚠️"));
-        let bad = verify_web_answer("Il Cervino è alto 4.810 metri [1][7].", &sources, "Quanto è alto?", "it");
+        let ok = verify_web_answer("Il Cervino è alto 4.478 metri [1].", &sources, "Quanto è alto il Cervino?", "it", "2026-11-07", "", "");
+        assert!(!ok.contains("⚠️"), "{ok}");
+        let bad = verify_web_answer("Il Cervino è alto 4.810 metri [1][7].", &sources, "Quanto è alto il Cervino?", "it", "2026-11-07", "", "");
         assert!(bad.contains("4810"));
         assert!(!bad.contains("[7]"));
-        let uncited = verify_web_answer("Il Cervino è molto alto.", &sources, "", "it");
-        assert!(uncited.contains("non cita"));
+        let names = verify_web_answer("Il Cervino è stato scalato dal Club Alpino Francese.", &sources, "Quanto è alto il Cervino?", "it", "2026-11-07", "", "");
+        assert!(names.contains("Club Alpino Francese"), "{names}");
+        let uncited = verify_web_answer("Il Cervino è molto alto.", &sources, "Quanto è alto il Cervino?", "it", "2026-11-07", "", "");
+        assert!(!uncited.contains("⚠️"));
+    }
+    #[test]
+    fn ages_from_today_and_invented_links() {
+        let sources = vec![source("Giorgia Meloni (Roma, 15 gennaio 1977) è una politica italiana.")];
+        let age = verify_web_answer("Ha 49 anni [1].", &sources, "quanti anni ha", "it", "2026-11-07", "chi è giorgia meloni", "");
+        assert!(!age.contains("⚠️"), "{age}");
+        let wrong = verify_web_answer("Ha 47 anni [1].", &sources, "quanti anni ha", "it", "2026-11-07", "chi è giorgia meloni", "");
+        assert!(wrong.contains("47"));
+        let links = verify_web_answer("Studi [1].\n- Sito: https://www.camcom.it/tema/2003/\n- Fonte: https://en.wikipedia.org/wiki/X", &sources, "", "it", "2026-11-07", "", "");
+        assert!(!links.contains("camcom") && links.contains("wikipedia"), "{links}");
     }
     #[test]
     fn plan_grammar_only_for_marker() {

@@ -40,11 +40,11 @@ test('chunks stay bounded', () => {
 
 test('verification flags invented numbers and invalid citations', () => {
   const sources = [{source: 1, text: 'The Matterhorn is 4,478 metres high.'}];
-  assert.equal(verifyAnswer('Il Cervino è alto 4.478 metri [1].', sources, '').ok, true);
+  assert.equal(verifyAnswer('Il Cervino è alto 4.478 metri [1].', sources, 'Quanto è alto il Cervino?').ok, true);
   const bad = finalizeAnswer('Il Cervino è alto 4.810 metri [1][5].', sources, '', 'it');
   assert.match(bad.text, /4810/);
   assert.doesNotMatch(bad.text, /\[5\]/);
-  assert.match(finalizeAnswer('Il Cervino è alto.', sources, '', 'it').text, /non cita/);
+  assert.doesNotMatch(finalizeAnswer('Il Cervino è alto.', sources, 'Quanto è alto il Cervino?', 'it').text, /⚠️/);
 });
 
 test('Wikipedia results become article and lightweight render URLs', () => {
@@ -59,14 +59,122 @@ test('research pipeline end to end with injected I/O', async () => {
   const calls = [];
   const deps = {
     now: new Date('2026-11-06T10:00:00Z'),
-    complete: async ({grammar, system}) => { calls.push(grammar ? 'plan' : 'answer'); return grammar ? '{"queries":["Matterhorn height","altezza Cervino"],"recent":false}' : 'Il Cervino è alto 4.478 metri [1].'; },
+    complete: async ({grammar, system}) => { calls.push(grammar ? 'plan' : 'answer'); return grammar ? '{"q":"Matterhorn height"}' : 'Il Cervino è alto 4.478 metri [1].'; },
     search: async () => [{title: 'Matterhorn', url: 'https://example.org/matterhorn', description: 'Matterhorn facts'}],
     wikipedia: async () => [],
     read: async () => '<article><p>The Matterhorn height is 4,478 metres; it lies between Switzerland and Italy near Zermatt.</p><p>' + 'It is one of the most famous mountains of the Alps and attracts many climbers every summer season. '.repeat(4) + '</p></article>'
   };
   const result = await research('Quanto è alto il Cervino?', {language: 'it', deps});
-  assert.deepEqual(calls, ['plan', 'answer']);
+  assert.deepEqual(calls, ['plan', 'answer']);  // one short English query, then the answer
+  calls.length = 0;
+  await research('Quanto è alto il Cervino?', {language: 'it', deps, planWithModel: false});
+  assert.deepEqual(calls, ['answer']);
   assert.equal(result.sources.length, 1);
   assert.equal(result.check.ok, true);
   assert.doesNotMatch(result.answer, /⚠️/);
+});
+
+test('conversation: small talk skips search, history reaches the answer, notes are stripped', async () => {
+  const { isSmallTalk, answerMessages } = await import('../web-rag.js');
+  assert.equal(isSmallTalk('grazie!'), true);
+  assert.equal(isSmallTalk('dove ha studiato'), false);
+  const history = [{role: 'user', text: 'chi è Giorgia Meloni'}, {role: 'assistant', text: 'È la Presidente del Consiglio [1].\n\n> ⚠️ Verifica: x.'}];
+  const messages = answerMessages('dove ha studiato', [{source: 1, title: 'T', url: 'https://it.wikipedia.org/wiki/X', text: 'Testo'}], '2026-11-06', 'it', history);
+  assert.deepEqual(messages.map(m => m.role), ['system', 'user', 'assistant', 'user']);
+  assert.doesNotMatch(messages[2].content, /⚠️/);
+  assert.match(messages[0].content, /chatting with the user/);
+});
+
+test('ages computed from source years are accepted; invented links are removed', async () => {
+  const { finalizeAnswer } = await import('../web-rag.js');
+  const sources = [{source: 1, url: 'https://it.wikipedia.org/wiki/Giorgia_Meloni', text: 'Giorgia Meloni (Roma, 15 gennaio 1977) è una politica italiana.'}];
+  const age = finalizeAnswer('Ha 49 anni: è nata il 15 gennaio 1977 [1].', sources, 'quanti anni ha', 'it', '2026-11-06');
+  assert.doesNotMatch(age.text, /⚠️/);
+  const links = finalizeAnswer('Non ho trovato gli studi [1].\n- Sito: https://www.camcom.it/tema/2003/\n- Wikipedia: https://it.wikipedia.org/wiki/Giorgia_Meloni', sources, '', 'it', '2026-11-06');
+  assert.doesNotMatch(links.text, /camcom|2003/);
+  assert.match(links.text, /wikipedia/);
+  assert.doesNotMatch(links.text, /⚠️/);
+});
+
+test('follow-ups inherit the subject; invented names are flagged', async () => {
+  const { resolveFollowUp, finalizeAnswer } = await import('../web-rag.js');
+  const history = [{role: 'user', text: 'chi è giorgia meloni'}, {role: 'assistant', text: 'x'}, {role: 'user', text: 'quanti anni ha'}, {role: 'assistant', text: 'y'}, {role: 'user', text: 'grazie'}];
+  assert.equal(resolveFollowUp('dove ha studiato', history), 'chi è giorgia meloni — dove ha studiato');
+  assert.equal(resolveFollowUp('Chi ha vinto Wimbledon 2025 nel singolare maschile?', history), 'Chi ha vinto Wimbledon 2025 nel singolare maschile?');
+  assert.equal(resolveFollowUp('chi è Mario Draghi', history), 'chi è Mario Draghi');
+  const sources = [{source: 1, title: 'Giorgia Meloni', url: 'https://it.wikipedia.org/wiki/Giorgia_Meloni', text: 'Giorgia Meloni si è diplomata all\'Istituto Amerigo Vespucci di Roma.'}];
+  const bad = finalizeAnswer('Giorgia Meloni ha studiato all\'Università di Firenze, Giurisprudenza.', sources, 'dove ha studiato', 'it', '2026-11-06', 'chi è giorgia meloni');
+  assert.match(bad.text, /nomi non sono nelle fonti: Università, Firenze, Giurisprudenza/);
+  const party = finalizeAnswer('Ha lavorato per il Partito Socialista Italiano. Ha 47 anni.', sources, 'quanti anni ha', 'it', '2026-11-06', 'chi è giorgia meloni');
+  assert.match(party.text, /Partito Socialista Italiano/);
+  assert.match(party.text, /numeri non sono nelle fonti: 47/);
+  const good = finalizeAnswer('Si è diplomata all\'Istituto Amerigo Vespucci di Roma [1].', sources, 'dove ha studiato', 'it', '2026-11-06');
+  assert.doesNotMatch(good.text, /⚠️/);
+});
+
+test('ages may use a birth year stated earlier in the conversation', async () => {
+  const { finalizeAnswer } = await import('../web-rag.js');
+  const sources = [{source: 1, url: 'https://it.wikipedia.org/wiki/Giorgia_Meloni', text: 'Giorgia Meloni è una politica italiana.'}];
+  assert.doesNotMatch(finalizeAnswer('Ha 49 anni.', sources, 'quanti anni ha', 'it', '2026-11-06', 'chi è giorgia meloni', 'È nata il 15 gennaio 1977.').text, /⚠️/);
+  assert.match(finalizeAnswer('Ha 49 anni.', sources, 'quanti anni ha', 'it', '2026-11-06', 'chi è giorgia meloni', '').text, /49/);
+});
+
+test('slow pages are dropped at the deadline and replaced by their snippet', async () => {
+  const { gatherSources, quickPlan } = await import('../web-rag.js');
+  assert.deepEqual(quickPlan('dove ha studiato', [{role: 'user', text: 'chi è giorgia meloni'}]).wiki, 'giorgia meloni');
+  const page = '<article><p>' + 'The Matterhorn is 4,478 metres high and lies on the border between Switzerland and Italy. '.repeat(5) + '</p></article>';
+  const deps = {
+    search: async () => [{title: 'Fast', url: 'https://fast.example/a', description: 'x'}, {title: 'Slow', url: 'https://slow.example/b', description: 'Slow snippet about the Matterhorn height of 4,478 metres in the Alps mountains.'}],
+    read: url => url.includes('slow') ? new Promise(r => setTimeout(() => r(page), 2000)) : Promise.resolve(page)
+  };
+  const started = Date.now();
+  const result = await gatherSources('Quanto è alto il Cervino Matterhorn?', {language: 'it', deps, readDeadlineMs: 200});
+  assert.ok(Date.now() - started < 1500);
+  assert.ok(result.sources.some(s => s.url === 'https://fast.example/a'));
+});
+
+test('list markers and labels are not reported as names', async () => {
+  const { verifyAnswer } = await import('../web-rag.js');
+  const sources = [{source: 1, url: 'https://en.wikipedia.org/wiki/Jannik_Sinner', text: 'Jannik Sinner won Wimbledon in 2025.'}];
+  const check = verifyAnswer('Ha vinto Jannik Sinner [1].\n- **Vittoria**: Jannik Sinner ha vinto.\n- Fonte: [1]', sources, 'Chi ha vinto Wimbledon 2025?');
+  assert.deepEqual(check.unsupportedNames, []);
+});
+
+test('reading does not wait for the English query; its pages join if in time', async () => {
+  const { gatherSources } = await import('../web-rag.js');
+  const page = word => '<article><p>' + (word + ' Matterhorn height is 4,478 metres on the border between Switzerland and Italy. ').repeat(5) + '</p></article>';
+  const reads = [];
+  const deps = {
+    complete: () => new Promise(r => setTimeout(() => r('{"q":"Matterhorn height"}'), 150)),
+    search: async q => q === 'Matterhorn height' ? [{title: 'English', url: 'https://en.example/m', description: 'x'}] : [{title: 'Locale', url: 'https://it.example/c', description: 'x'}],
+    read: async url => { reads.push([url, Date.now()]); return page(url.includes('en.') ? 'English' : 'Locale'); }
+  };
+  const started = Date.now();
+  const result = await gatherSources('Quanto è alto il Cervino?', {language: 'it', deps, readDeadlineMs: 1000});
+  assert.ok(reads[0][1] - started < 120, 'local pages are read before the English query is ready');
+  assert.ok(reads.some(([url]) => url === 'https://en.example/m'), 'English results are read when they arrive in time');
+  assert.ok(result.plan.queries.includes('Matterhorn height'));
+  const slow = {...deps, complete: () => new Promise(r => setTimeout(() => r('{"q":"Matterhorn height"}'), 900))};
+  reads.length = 0;
+  await gatherSources('Quanto è alto il Cervino?', {language: 'it', deps: slow, readDeadlineMs: 1000});
+  assert.ok(!reads.some(([url]) => url === 'https://en.example/m'), 'late English query is not read past the deadline');
+});
+
+test('web search only when the message needs it', async () => {
+  const { needsWebSearch } = await import('../web-rag.js');
+  for (const q of ['Chi ha vinto Wimbledon 2025?', 'chi è giorgia meloni', 'quanti anni ha', 'cerca una ricetta per la poesia', 'scrivi un riassunto delle ultime notizie su Ginevra', 'Quanto è alto il Cervino?', 'What is the price of bitcoin?'])
+    assert.equal(needsWebSearch(q), true, q);
+  for (const q of ['ciao', 'grazie!', 'scrivimi una poesia sul mare', 'traduci in inglese: buongiorno a tutti', 'quanto fa 15*23', '15 x 23 =', 'scrivi una funzione python che ordina una lista', 'correggi questo testo: io sono andato al mare ieri', 'spiegamelo più semplice', 'Write an email to my boss', 'x'.repeat(700)])
+    assert.equal(needsWebSearch(q), false, q);
+});
+
+test('a short question with a new proper noun starts a new subject', async () => {
+  const { resolveFollowUp } = await import('../web-rag.js');
+  const wimbledon = [{role: 'user', text: 'Chi ha vinto Wimbledon 2025 nel singolare maschile?'}, {role: 'assistant', text: 'Sinner'}];
+  assert.equal(resolveFollowUp('Quanto è alto il Cervino?', wimbledon), 'Quanto è alto il Cervino?');
+  assert.equal(resolveFollowUp('e nel 2024?', wimbledon), 'Chi ha vinto Wimbledon 2025 nel singolare maschile? — e nel 2024?');
+  const meloni = [{role: 'user', text: 'chi è giorgia meloni'}, {role: 'assistant', text: 'x'}];
+  assert.equal(resolveFollowUp('dove ha studiato', meloni), 'chi è giorgia meloni — dove ha studiato');
+  assert.equal(resolveFollowUp('è nata a Roma?', meloni), 'chi è giorgia meloni — è nata a Roma?');
+  assert.equal(resolveFollowUp('Chi è Mario Draghi?', meloni), 'Chi è Mario Draghi?');
 });
