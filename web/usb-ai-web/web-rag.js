@@ -244,6 +244,36 @@ export function isSmallTalk(text) {
   return t.length <= 40 && SMALL_TALK.test(t);
 }
 
+// Decides, instantly and without a model call, whether a message needs the web.
+// Explicit requests for current information always search; writing, translating,
+// correcting, maths, code and questions about the conversation do not.
+// Strong cues always search; weak cues (dates, prices) search unless the message
+// starts with a task on given text ("correggi: ... ieri ...").
+const STRONG_CUE = /\b(?:cerca|cercami|search|look up|google|busca|buscar|cherche|recherche|suche|such)\b|notizi|\bnews\b|nouvelles|nachrichten|noticias|meteo|weather|wetter|météo/i;
+const WEAK_CUE = /oggi|ieri|today|yesterday|heute|aujourd|hoy|ultim[eio]|latest|recent|attual|current|aktuell|actuel|prezz|price|preis|prix|precio|\b20(?:2[4-9]|3\d)\b/i;
+const TASK_START = /^(?:per favore\s+|please\s+|puoi\s+|can you\s+)?(?:scrivi|scrivimi|componi|inventa|traduci|tradurre|correggi|riformula|riscrivi|calcola|risolvi|write|compose|translate|proofread|rewrite|rephrase|calculate|solve|écris|traduis|corrige|reformule|calcule|schreib\w*|übersetze|korrigiere|berechne|escribe|traduce|corrige|reescribe|calcula)\b/i;
+const NO_WEB = [
+  // writing and creativity
+  /\b(?:scrivi|scrivimi|componi|inventa|immagina|write|compose|invent|imagine|écris|écrire|rédige|schreib(?:e|en)?|verfasse|escribe|escribir|redacta)\b|\b(?:poesia|poesie|poem|poème|gedicht|poema|racconto|storia breve|short story|haiku|filastrocca|barzelletta|joke|blague|witz|chiste|slogan|email|e-mail|lettera|letter|lettre|brief|carta|messaggio di auguri|auguri)\b/i,
+  // translation and editing
+  /\b(?:traduci|traduce|tradurre|translate|traduis|traduire|übersetze|übersetzen|traducir|correggi|correggere|riformula|riscrivi|migliora (?:questo|il) testo|proofread|rewrite|rephrase|corrige|corriger|reformule|korrigiere|umschreiben|reescribe|corrige)\b/i,
+  // maths
+  /^[\s\d.,+\-*/x×÷^()%=?]+$|\b(?:calcola|calculate|calcule|berechne|calcula|quanto fa|how much is|risolvi|solve|résous|löse|resuelve|equazione|equation|équation|gleichung|ecuación|derivata|integrale|derivative|integral)\b/i,
+  // code
+  /```|\b(?:codice|code|programma|script|funzione|function|python|javascript|typescript|html|css|sql|regex|java|c\+\+|rust|bash|json|bug|debug)\b/i,
+  // the conversation itself
+  /\b(?:quello che hai (?:detto|scritto)|la tua risposta|spiegamelo|più semplice|più breve|più lungo|riassumi (?:la|questa) (?:conversazione|chat)|continua|what you (?:said|wrote)|your (?:answer|reply)|explain (?:that|it) (?:again|better|simpler)|simpler|shorter|continue|ce que tu as dit|continue|was du gesagt|einfacher|lo que dijiste|más simple|continúa)\b/i
+];
+export function needsWebSearch(text) {
+  const t = String(text).trim();
+  if (!t || isSmallTalk(t)) return false;
+  if (t.length > 600) return false;  // pasted text: work on it, do not search it
+  if (STRONG_CUE.test(t)) return true;
+  if (TASK_START.test(t)) return false;
+  if (WEAK_CUE.test(t)) return true;
+  return !NO_WEB.some(re => re.test(t));
+}
+
 // Recent turns, without the verification notes appended to earlier answers.
 export function conversationTurns(history = [], limit = 2) {
   return history.filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string' && m.text.trim())

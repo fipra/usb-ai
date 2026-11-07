@@ -159,3 +159,11 @@ test('reading does not wait for the English query; its pages join if in time', a
   await gatherSources('Quanto è alto il Cervino?', {language: 'it', deps: slow, readDeadlineMs: 1000});
   assert.ok(!reads.some(([url]) => url === 'https://en.example/m'), 'late English query is not read past the deadline');
 });
+
+test('web search only when the message needs it', async () => {
+  const { needsWebSearch } = await import('../web-rag.js');
+  for (const q of ['Chi ha vinto Wimbledon 2025?', 'chi è giorgia meloni', 'quanti anni ha', 'cerca una ricetta per la poesia', 'scrivi un riassunto delle ultime notizie su Ginevra', 'Quanto è alto il Cervino?', 'What is the price of bitcoin?'])
+    assert.equal(needsWebSearch(q), true, q);
+  for (const q of ['ciao', 'grazie!', 'scrivimi una poesia sul mare', 'traduci in inglese: buongiorno a tutti', 'quanto fa 15*23', '15 x 23 =', 'scrivi una funzione python che ordina una lista', 'correggi questo testo: io sono andato al mare ieri', 'spiegamelo più semplice', 'Write an email to my boss', 'x'.repeat(700)])
+    assert.equal(needsWebSearch(q), false, q);
+});

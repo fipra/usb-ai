@@ -7,13 +7,15 @@ def apply(app, root, replace):
     Apply before other patches that rewrite the end of main.js.
     """
     main = app / 'main.js'
-    replace(main, "import './style.css';", "import './style.css';\nimport { gatherSources, answerMessages, isSmallTalk, finalizeAnswer, parseWikipediaSearch, wikipediaSearchURL } from './web-rag.js';")
+    replace(main, "import './style.css';", "import './style.css';\nimport { gatherSources, answerMessages, needsWebSearch, finalizeAnswer, parseWikipediaSearch, wikipediaSearchURL } from './web-rag.js';")
     replace(main, 'let thinking = false, semanticEnabled = false;', 'let thinking = false, semanticEnabled = false;\nlet webSearchEnabled = false;')
     replace(main, "$('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');", "renderWebSearch(); $('semantic-toggle').textContent = tr(semanticEnabled ? 'semanticOn' : 'semanticOff');")
     replace(main, "  $('semantic-toggle').disabled = value;", "  $('semantic-toggle').disabled = value;\n  $('web-search-toggle').disabled = value;")
     replace(main, "let pendingAnswer = '';", "let pendingAnswer = '';\n  let webRagFound = null, webRagToday = '', webRagContext = '', webRagYears = '';")
     replace(main, "    if (!isRemote(selectedId)) {\n      setStatus(tr('loading'), false, true);", """    // A chat with documents answers from them: never search the web there.
-    if (webSearchEnabled && !isSmallTalk(text) && !chatDocuments.length) {
+    // Web search runs only when the message needs it (like an assistant deciding to search).
+    if (webSearchEnabled && !chatDocuments.length && !needsWebSearch(text)) answer.webSkipped = true;
+    if (webSearchEnabled && needsWebSearch(text) && !chatDocuments.length) {
       if (isRemote(selectedId)) throw Error(tr('webSearchLocalOnly'));
       if (text.length > 600) throw Error(tr('webSearchLong'));
       setStatus(tr('loading'), false, true);
@@ -45,7 +47,8 @@ def apply(app, root, replace):
     # Web answers stream visibly (they are generated without reasoning).
     replace(main, "if (showGenerationThinking) { answer.text = pendingAnswer; streamView?.update(); }", "if (showGenerationThinking || webRagFound) { answer.text = showGenerationThinking ? pendingAnswer : normalizeThinking(pendingAnswer); streamView?.update(); }")
     replace(main, 'else answer.text = normalizeThinking(pendingAnswer);', 'else answer.text = normalizeThinking(pendingAnswer);\n    if (webRagFound && answer.text) answer.text = finalizeAnswer(answer.text, webRagFound, text, language, webRagToday, webRagContext, webRagYears).text;')
-    replace(main, "if (message.text) content.append(messageActions(chat, message));", """if (message.webSources?.length) {
+    replace(main, "if (message.text) content.append(messageActions(chat, message));", """if (message.webSkipped && message.text) content.append(node('p', tr('webSkipped'), 'hint'));
+if (message.webSources?.length) {
   const details = node('details', undefined, 'source');
   details.append(node('summary', `${tr('webSearchSources')} (${message.webSources.length})`));
   for (const [index, source] of message.webSources.entries()) {
