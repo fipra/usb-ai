@@ -76,3 +76,7 @@ test('an omitted query is repaired locally before any network request',async()=>
  assert.equal(calls,2);assert.equal(turn.verify,true);assert.deepEqual(sent,['tennis ATP rankings current']);
  await assert.rejects(resolveWebTurn('sei sicuro?',history,async()=>++calls===3?json('verify','Verifica il tennis'):'sei sicuro',undefined,async()=>assert.fail('generic query must not leave device')),/WEB_CONTEXT_UNCLEAR/);
 });
+
+test('reuse requires an earlier answer; an ambiguous opening cannot invent its referent',async()=>{
+ await assert.rejects(resolveWebTurn('e lui?',[],async()=>json('reuse','E lui?'),undefined,async()=>assert.fail('no search')),/WEB_CONTEXT_UNCLEAR/);
+});
