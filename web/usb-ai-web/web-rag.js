@@ -12,13 +12,20 @@ export const languageName = code => LANGUAGE_NAMES[code] || 'English';
 // Short follow-ups inherit the subject of the conversation, so a small model
 // cannot lose it ("dove ha studiato" after "chi è Giorgia Meloni").
 const NEW_SUBJECT = /^(?:chi è|chi era|cos'è|cosa è|che cos'è|cosa sono|who is|who was|what is|what are|qui est|qu'est-ce|wer ist|was ist|quién es|qué es)(?=\s|$)/i;
-const isFollowUp = text => text.split(/\s+/).filter(Boolean).length <= 6 && !NEW_SUBJECT.test(text.trim());
+// A capitalised word after the first one that the earlier question does not
+// contain is a new subject ("Quanto è alto il Cervino?" after Wimbledon).
+const newProperNoun = (text, root) => text.trim().split(/\s+/).slice(1)
+  .map(w => w.split(/['’]/).pop().replace(/^[^\p{L}]+|[^\p{L}]+$/gu, ''))
+  .some(w => /^\p{Lu}[\p{L}-]{2,}$/u.test(w) && !root.toLowerCase().includes(w.toLowerCase()));
+// Messages that start with a verb have no subject of their own ("è nata a Roma?").
+const STARTS_WITH_VERB = /^(?:e\s+|and\s+)?(?:è|e'|ha|hanno|era|erano|sono|fu|furono|is|was|are|were|has|have|did|does|est|était|a|ont|ist|war|hat|sind|es|fue|era|tiene|tuvo)(?=\s|$)/i;
+const isFollowUp = (text, root = '') => text.split(/\s+/).filter(Boolean).length <= 6 && !NEW_SUBJECT.test(text.trim()) && (STARTS_WITH_VERB.test(text.trim()) || !newProperNoun(text, root));
 export function resolveFollowUp(question, history = []) {
   const users = history.filter(m => m && m.role === 'user' && typeof m.text === 'string' && m.text.trim() && !isSmallTalk(m.text)).map(m => m.text.trim());
   let root = '';
-  for (const text of users) root = root && isFollowUp(text) ? root : text;
+  for (const text of users) root = root && isFollowUp(text, root) ? root : text;
   const current = question.trim();
-  return root && isFollowUp(current) ? `${root.slice(0, 200)} — ${current}` : current;
+  return root && isFollowUp(current, root) ? `${root.slice(0, 200)} — ${current}` : current;
 }
 
 // The model rewrites the conversation into self-contained search queries.

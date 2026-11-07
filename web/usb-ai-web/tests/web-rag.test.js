@@ -167,3 +167,14 @@ test('web search only when the message needs it', async () => {
   for (const q of ['ciao', 'grazie!', 'scrivimi una poesia sul mare', 'traduci in inglese: buongiorno a tutti', 'quanto fa 15*23', '15 x 23 =', 'scrivi una funzione python che ordina una lista', 'correggi questo testo: io sono andato al mare ieri', 'spiegamelo più semplice', 'Write an email to my boss', 'x'.repeat(700)])
     assert.equal(needsWebSearch(q), false, q);
 });
+
+test('a short question with a new proper noun starts a new subject', async () => {
+  const { resolveFollowUp } = await import('../web-rag.js');
+  const wimbledon = [{role: 'user', text: 'Chi ha vinto Wimbledon 2025 nel singolare maschile?'}, {role: 'assistant', text: 'Sinner'}];
+  assert.equal(resolveFollowUp('Quanto è alto il Cervino?', wimbledon), 'Quanto è alto il Cervino?');
+  assert.equal(resolveFollowUp('e nel 2024?', wimbledon), 'Chi ha vinto Wimbledon 2025 nel singolare maschile? — e nel 2024?');
+  const meloni = [{role: 'user', text: 'chi è giorgia meloni'}, {role: 'assistant', text: 'x'}];
+  assert.equal(resolveFollowUp('dove ha studiato', meloni), 'chi è giorgia meloni — dove ha studiato');
+  assert.equal(resolveFollowUp('è nata a Roma?', meloni), 'chi è giorgia meloni — è nata a Roma?');
+  assert.equal(resolveFollowUp('Chi è Mario Draghi?', meloni), 'Chi è Mario Draghi?');
+});
