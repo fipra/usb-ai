@@ -17,6 +17,7 @@ use tiny_http::{Header, Method, Response, Server, StatusCode};
 mod creator;
 mod lab;
 mod quantize;
+mod web_research;
 
 const INDEX: &str = include_str!("../web/index.html");
 const MODEL_CATALOG: &str = include_str!("../models/catalog.json");
@@ -3026,6 +3027,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let _ = request.respond(Response::from_string(error).with_status_code(400));
                 }
             }
+            continue;
+        }
+        if method == Method::Post && url == "/api/read-article" {
+            let strict_origin = request
+                .headers()
+                .iter()
+                .any(|h| h.field.equiv("Origin") && origin_matches_host(h.value.as_str(), host));
+            if !local_client || !strict_origin {
+                let _ = request
+                    .respond(Response::from_string("Local origin required").with_status_code(403));
+                continue;
+            }
+            let mut bytes = Vec::new();
+            let parsed = request
+                .as_reader()
+                .take(4097)
+                .read_to_end(&mut bytes)
+                .map_err(|_| "Invalid request")
+                .and_then(|_| {
+                    if bytes.len() > 4096 {
+                        return Err("Request too large");
+                    }
+                    serde_json::from_slice::<Value>(&bytes).map_err(|_| "Invalid JSON")
+                });
+            thread::spawn(move || {
+                let result = parsed
+                    .map_err(str::to_owned)
+                    .and_then(|data| web_research::read_article(&data));
+                let (code, body) = match result {
+                    Ok(body) => (200, body),
+                    Err(error) => (400, json!({"error":error}).to_string().into_bytes()),
+                };
+                let _ = request.respond(
+                    Response::from_data(body)
+                        .with_status_code(code)
+                        .with_header(
+                            Header::from_bytes("Content-Type", "application/json").unwrap(),
+                        )
+                        .with_header(Header::from_bytes("Cache-Control", "no-store").unwrap()),
+                );
+            });
             continue;
         }
         if method == Method::Post && url == "/api/stop" && allowed_origin {

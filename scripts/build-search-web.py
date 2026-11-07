@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
   details.append(node('summary', `${tr('webSearchSources')} (${message.webSources.length})`));
   for (const [index, source] of prepareWebResults(message.webSources).entries()) {
     const row = node('p'); const link = node('a', `[${index + 1}] ${source.title}`);
-    link.href = source.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; row.append(link); details.append(row);
+    link.href = source.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; row.append(link, node('span', ` · ${tr(source.kind === 'page' ? 'webSearchPage' : 'webSearchSnippet')}`), node('p', source.description)); details.append(row);
   }
   content.append(details);
 } if (message.text) content.append(messageActions(chat, message));""")
@@ -60,6 +60,8 @@ with tempfile.TemporaryDirectory(prefix='llamanest-search-') as tmp:
     replace(html, '</body>', '''<dialog id="web-search-dialog"><header class="dialog-head"><h2 data-i18n="webSearchTitle"></h2><button type="button" class="close" id="web-search-close" aria-label="Close">×</button></header><div class="dialog-body"><p data-i18n="webSearchPrivacy"></p><p class="hint" data-i18n="webSearchFree"></p><p><a href="https://puri.li/terms" target="_blank" rel="noopener noreferrer" data-i18n="webSearchTerms"></a></p><button type="button" id="web-search-enable" class="action" data-i18n="webSearchActivate"></button></div></dialog></body>''')
     with (app / 'i18n.js').open('a') as out:
         out.write('\n' + (root / 'scripts' / 'web-search-strings.js').read_text())
-    env = dict(os.environ, USB_AI_WEB_BASE='/ricerca-web/')
+    env = dict(os.environ, USB_AI_WEB_BASE=os.environ.get('USB_AI_WEB_BASE', '/ricerca-web/'))
     subprocess.run(['npm', 'run', 'build'], cwd=work, env=env, check=True)
-    shutil.copytree(work / 'dist', root / '.vercel-static' / 'ricerca-web', dirs_exist_ok=True)
+    destination = Path(os.environ.get('USB_AI_SEARCH_OUTPUT', root / 'release' / 'ricerca-web')).resolve()
+    shutil.copytree(work / 'dist', destination, dirs_exist_ok=True)
+    print(f'Web research build: {destination}')
