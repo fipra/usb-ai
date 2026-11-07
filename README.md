@@ -133,3 +133,11 @@ See [VERIFICHE.md](VERIFICHE.md) for verification status and the licensing secti
 ## Model Creator Lab (experimental)
 
 The desktop Laboratory includes Model Creator for training a small Transformer from scratch with local Python and PyTorch. It can export an F32 GGUF for LlamaNest Web when the `gguf` Python package is installed. See [MODEL_CREATOR.md](MODEL_CREATOR.md) for setup, limitations, evaluation and export.
+
+### Shared web research experiment
+
+The browser and native search builds use `web/usb-ai-web/web-search.js` for query planning, source filtering and passage selection. Discovery uses Wikipedia and Purili; Wikipedia introductions are followed by an exact-page read. Public publisher HTML can be read through the optional `/api/read-article` adapter. The native adapter accepts only same-origin loopback requests, public HTTPS hosts and validated, DNS-pinned redirects. Static hosting works without this adapter using Wikipedia and provider context; unavailable publisher pages remain labelled as snippets. Purili’s personal, non-commercial terms still apply.
+
+Run `npm ci --prefix web`, `npm test --prefix web` and `python3 scripts/build-search-web.py`. The static result is written to `release/ricerca-web`; set `USB_AI_WEB_BASE` for the public path and `USB_AI_SEARCH_OUTPUT` for another destination. No publishing is performed. For Mac, run `python3 scripts/prepare-mac-search.py /path/to/new-source`, then build/package that isolated source tree.
+
+Search is opt-in for each page session. Documents and model weights are not sent to the discovery services. Sources are displayed with their selected passages and read/snippet status in the browser. A model may still omit a fact or citation; source retrieval is not a guarantee of answer correctness.
