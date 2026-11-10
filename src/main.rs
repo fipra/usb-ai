@@ -557,6 +557,8 @@ struct GenerationUsage {
     input_tokens: u64,
     output_tokens: u64,
     tokens_per_second: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    gpu_layers: Option<String>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Source {
@@ -602,6 +604,8 @@ struct Workspace {
     inference_backend: String,
     #[serde(default)]
     inference_threads: u32,
+    #[serde(default)]
+    speed_mode: bool,
     #[serde(default)]
     inference_engine: String,
     #[serde(default)]
@@ -763,6 +767,47 @@ struct InferenceServer {
     model: PathBuf,
     port: u16,
     child: Child,
+    gpu_layers: Option<String>,
+    speed_mode_active: bool,
+    spec_enabled: bool,
+    spec_supported: bool,
+}
+
+fn speed_mode_args(help: &str, effective_context: u32) -> Vec<String> {
+    let mut args = Vec::new();
+    if help.contains("-ngl") || help.contains("--gpu-layers") {
+        args.extend(["-ngl".into(), "999".into()]);
+    }
+    if help.contains("-np,") || help.contains("--parallel") {
+        args.extend(["-np".into(), "1".into()]);
+    }
+    if help.contains("--flash-attn") {
+        args.extend(["-fa".into(), "on".into()]);
+    }
+    args.extend(["-c".into(), effective_context.to_string()]);
+    if help.contains("--spec-type") {
+        args.extend(["--spec-type".into(), "ngram-simple".into()]);
+    }
+    args
+}
+
+fn effective_context(requested: u32, ram_gb: Option<f64>, speed_mode: bool) -> u32 {
+    let requested = if requested == 0 { 8192 } else { requested };
+    if speed_mode && ram_gb.is_some_and(|ram| ram <= 16.0) {
+        requested.min(8192)
+    } else {
+        requested
+    }
+}
+
+fn gpu_layers_from_log(text: &str) -> Option<String> {
+    text.lines().find_map(|line| {
+        let lower = line.to_ascii_lowercase();
+        let start = lower.find("offloaded ")? + "offloaded ".len();
+        let tail = &line[start..];
+        let end = tail.to_ascii_lowercase().find(" layers")?;
+        Some(tail[..end].trim().to_owned())
+    })
 }
 
 struct ActiveGeneration {
@@ -848,6 +893,7 @@ fn read_completion_stream(
                     input_tokens,
                     output_tokens,
                     tokens_per_second,
+                    gpu_layers: None,
                 });
             }
         }
@@ -1761,6 +1807,7 @@ impl App {
         }).collect::<Vec<_>>();
         json!({"chats":self.db.chats,"memory":self.db.memory,"documents":self.db.documents.iter().map(|d|json!({"id":d.id,"name":d.name,"count":d.chunks.len(),"pageCount":d.page_count,"chatId":d.chat_id})).collect::<Vec<_>>(),
             "models":installed,"modelDetails":model_details,"ignoredModelFiles":self.ignored_model_files(),"modelsDir":self.models,"model":self.selected,"root":self.root,"language":self.language(),"thinking":self.db.thinking,"inferenceBackend":if self.db.inference_backend.is_empty() { "auto" } else { &self.db.inference_backend },"inferenceThreads":self.db.inference_threads,"contextSize":self.db.context_size,"outputLimit":self.db.output_limit,"temperature":self.db.temperature.unwrap_or(0.3),"inferenceEngine":self.inference_engine(),"prismOnly":self.prism_only(),"prismAvailable":prism_server_path().is_some(),"catalog":catalog,"hardware":self.hardware,
+            "speedMode":self.db.speed_mode,"speedModeAvailable":cfg!(all(target_os="macos",target_arch="aarch64")),"speedContextLimited":self.db.speed_mode && self.hardware.ram_gb.is_some_and(|ram| ram <= 16.0),"speedModeFallback":self.db.speed_mode && self.inference.as_ref().is_some_and(|server| !server.speed_mode_active),"speedSpecEnabled":self.inference.as_ref().is_some_and(|server| server.spec_enabled),"speedSpecUnsupported":self.db.speed_mode && self.inference.as_ref().is_some_and(|server| server.speed_mode_active && !server.spec_supported),
             "download":self.download_status(),"quantizeAvailable":quantize_available(),"quantize":self.quantization.as_ref().map(|job|job.lock().unwrap().status())})
     }
     fn download_status(&self) -> Value {
@@ -1884,16 +1931,19 @@ impl App {
             "set-inference-options" => {
                 let backend = data["backend"].as_str().ok_or("Missing backend")?;
                 let threads = data["threads"].as_u64().ok_or("Invalid thread count")?;
+                let speed_mode = data["speedMode"].as_bool().unwrap_or(false);
                 if !["auto", "cpu", "gpu"].contains(&backend) || ![0, 1, 2, 4, 8].contains(&threads)
                 {
                     return Err("Invalid inference options".into());
                 }
                 if self.db.inference_backend != backend
                     || self.db.inference_threads != threads as u32
+                    || self.db.speed_mode != speed_mode
                 {
                     self.inference = None;
                     self.db.inference_backend = backend.to_owned();
                     self.db.inference_threads = threads as u32;
+                    self.db.speed_mode = speed_mode;
                     self.save()?;
                 }
                 Ok(self.state())
@@ -2271,9 +2321,16 @@ impl App {
         }
         if self.inference.is_none() {
             let mut load_error = String::new();
-            let modes: &[bool] = match self.db.inference_backend.as_str() {
-                "cpu" => &[true],
-                "gpu" => &[false],
+            let speed_requested = self.db.speed_mode
+                && !self.prism_only()
+                && cfg!(all(target_os = "macos", target_arch = "aarch64"));
+            let mut speed_attempted = false;
+            let modes: &[bool] = match (self.db.inference_backend.as_str(), speed_requested) {
+                ("cpu", true) => &[false, true],
+                ("cpu", false) => &[true],
+                ("gpu", true) => &[false, false],
+                ("gpu", false) => &[false],
+                (_, true) => &[false, false, true],
                 _ => &[false, true],
             };
             for &cpu_only in modes {
@@ -2290,23 +2347,40 @@ impl App {
                 } else {
                     tool_path("LLAMA_SERVER", "llama-server")
                 };
+                let help = if speed_requested && !speed_attempted {
+                    Command::new(&server_path)
+                        .arg("--help")
+                        .output()
+                        .ok()
+                        .map(|out| {
+                            format!(
+                                "{}{}",
+                                String::from_utf8_lossy(&out.stdout),
+                                String::from_utf8_lossy(&out.stderr)
+                            )
+                        })
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
                 let mut command = Command::new(server_path);
                 if prism {
                     command.args(["--cors-origins", "http://127.0.0.1:0"]);
                 }
+                let speed_active = speed_requested && !speed_attempted && !cpu_only;
+                let context =
+                    effective_context(self.db.context_size, self.hardware.ram_gb, speed_active);
                 command
                     .args(["--host", "127.0.0.1", "--port", &port.to_string(), "-m"])
-                    .arg(model)
-                    .args([
-                        "-c",
-                        &if self.db.context_size == 0 {
-                            8192
-                        } else {
-                            self.db.context_size
-                        }
-                        .to_string(),
-                        "--no-webui",
-                    ]);
+                    .arg(model);
+                if speed_active {
+                    let args = speed_mode_args(&help, context);
+                    command.args(args);
+                    speed_attempted = true;
+                } else {
+                    command.args(["-c", &context.to_string()]);
+                }
+                command.arg("--no-webui");
                 if is_qwen35(model) {
                     command.arg("--jinja");
                 }
@@ -2315,15 +2389,27 @@ impl App {
                 }
                 if cpu_only {
                     command.args(["--device", "none", "-ngl", "0"]);
-                } else if self.db.inference_backend == "gpu"
-                    || env::var_os("USB_AI_GPU").is_some_and(|value| value == "1")
+                } else if !speed_active
+                    && (self.db.inference_backend == "gpu"
+                        || env::var_os("USB_AI_GPU").is_some_and(|value| value == "1"))
                 {
                     command.args(["-ngl", "999"]);
                 }
+                let stderr_log = if speed_active {
+                    let path = self.root.join("llama-server-speed.log");
+                    fs::OpenOptions::new()
+                        .create(true)
+                        .write(true)
+                        .truncate(true)
+                        .open(path)
+                        .ok()
+                } else {
+                    None
+                };
                 let child = match command
                     .stdin(Stdio::null())
                     .stdout(Stdio::null())
-                    .stderr(Stdio::null())
+                    .stderr(stderr_log.map(Stdio::from).unwrap_or(Stdio::null()))
                     .spawn()
                 {
                     Ok(child) => child,
@@ -2336,6 +2422,10 @@ impl App {
                     model: model.to_path_buf(),
                     port,
                     child,
+                    gpu_layers: None,
+                    speed_mode_active: speed_active,
+                    spec_enabled: speed_active && help.contains("--spec-type"),
+                    spec_supported: help.contains("--spec-type"),
                 });
                 let deadline = Instant::now() + Duration::from_secs(180);
                 loop {
@@ -2369,6 +2459,14 @@ impl App {
                         .output();
                     if status.is_ok_and(|output| output.status.success() && output.stdout == b"200")
                     {
+                        if let Some(server) = self.inference.as_mut() {
+                            if server.speed_mode_active {
+                                server.gpu_layers =
+                                    fs::read_to_string(self.root.join("llama-server-speed.log"))
+                                        .ok()
+                                        .and_then(|text| gpu_layers_from_log(&text));
+                            }
+                        }
                         break;
                     }
                     if Instant::now() >= deadline {
@@ -2489,7 +2587,21 @@ impl App {
                 None,
             ));
         }
-        let usage = stream_result?;
+        let mut usage = stream_result?;
+        if let Some(usage) = &mut usage {
+            let log = self.root.join("llama-server-speed.log");
+            usage.gpu_layers = self
+                .inference
+                .as_ref()
+                .filter(|server| server.speed_mode_active)
+                .and_then(|server| {
+                    server.gpu_layers.clone().or_else(|| {
+                        fs::read_to_string(log)
+                            .ok()
+                            .and_then(|text| gpu_layers_from_log(&text))
+                    })
+                });
+        }
         if !output.status.success() {
             self.inference = None;
             return Err(format!(
@@ -3640,6 +3752,42 @@ mod tests {
             "User: hi\nAssistant:"
         );
     }
+
+    #[test]
+    fn speed_mode_args_only_include_supported_flags() {
+        let help =
+            "-ngl, --gpu-layers N\n-np, --parallel N\n-fa, --flash-attn on|off\n--spec-type TYPE";
+        assert_eq!(
+            speed_mode_args(help, 8192),
+            vec![
+                "-ngl",
+                "999",
+                "-np",
+                "1",
+                "-fa",
+                "on",
+                "-c",
+                "8192",
+                "--spec-type",
+                "ngram-simple"
+            ]
+        );
+        assert_eq!(
+            speed_mode_args("-ngl N\n-np, --parallel N\n-fa, --flash-attn on|off", 4096),
+            vec!["-ngl", "999", "-np", "1", "-fa", "on", "-c", "4096"]
+        );
+        assert_eq!(effective_context(65536, Some(16.0), true), 8192);
+        assert_eq!(effective_context(65536, Some(24.0), true), 65536);
+    }
+
+    #[test]
+    fn gpu_layer_count_is_read_from_server_log() {
+        assert_eq!(
+            gpu_layers_from_log("llama_model_loader: offloaded 28/29 layers to GPU"),
+            Some("28/29".into())
+        );
+        assert_eq!(gpu_layers_from_log("server ready"), None);
+    }
     #[test]
     fn hub_models_require_safe_paths_and_pinned_lfs_hash() {
         let entry = json!({"size": 2_147_483_648_u64, "lfs": {"sha256": "a".repeat(64)}});
@@ -4197,6 +4345,10 @@ mod tests {
                 model: root.join("test.gguf"),
                 port: 1,
                 child,
+                gpu_layers: None,
+                speed_mode_active: false,
+                spec_enabled: false,
+                spec_supported: false,
             });
             app.command("unload-model", json!({})).unwrap();
             assert!(app.inference.is_none());
@@ -4265,15 +4417,17 @@ mod tests {
         let settings = app
             .command(
                 "set-inference-options",
-                json!({"backend":"cpu","threads":4}),
+                json!({"backend":"cpu","threads":4,"speedMode":true}),
             )
             .unwrap();
         assert_eq!(settings["inferenceBackend"], "cpu");
         assert_eq!(settings["inferenceThreads"], 4);
+        assert_eq!(settings["speedMode"], true);
         let saved: Workspace =
             serde_json::from_slice(&fs::read(root.join("workspace.json")).unwrap()).unwrap();
         assert_eq!(saved.inference_backend, "cpu");
         assert_eq!(saved.inference_threads, 4);
+        assert!(saved.speed_mode);
         assert!(app
             .command(
                 "set-inference-options",
