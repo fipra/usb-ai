@@ -167,11 +167,71 @@ const splitModelStrings = {
 for (const language of Object.keys(splitModelStrings)) Object.assign(window.USB_AI_I18N[language], splitModelStrings[language]);
 
 const inferenceSettingsStrings = {
- en:{inferenceSettings:'Inference settings',inferenceBackend:'Device',inferenceThreads:'CPU threads',inferenceAuto:'Automatic',inferenceHelp:'Automatic keeps the existing behavior. CPU disables GPU offloading; GPU requests GPU offloading and requires a compatible llama-server build. Changes reload the model on the next message.'},
- it:{inferenceSettings:'Impostazioni di inferenza',inferenceBackend:'Dispositivo',inferenceThreads:'Thread CPU',inferenceAuto:'Automatico',inferenceHelp:'Automatico mantiene il comportamento attuale. CPU disattiva la GPU; GPU richiede l’accelerazione e una versione compatibile di llama-server. Le modifiche ricaricano il modello al prossimo messaggio.'},
- fr:{inferenceSettings:'Paramètres d’inférence',inferenceBackend:'Périphérique',inferenceThreads:'Threads CPU',inferenceAuto:'Automatique',inferenceHelp:'Automatique conserve le comportement actuel. CPU désactive le GPU ; GPU demande une version compatible de llama-server. Le modèle sera rechargé au prochain message.'},
- de:{inferenceSettings:'Inferenz-Einstellungen',inferenceBackend:'Gerät',inferenceThreads:'CPU-Threads',inferenceAuto:'Automatisch',inferenceHelp:'Automatisch behält das bisherige Verhalten bei. CPU deaktiviert die GPU; GPU benötigt eine kompatible llama-server-Version. Das Modell wird bei der nächsten Nachricht neu geladen.'},
- es:{inferenceSettings:'Configuración de inferencia',inferenceBackend:'Dispositivo',inferenceThreads:'Hilos de CPU',inferenceAuto:'Automático',inferenceHelp:'Automático mantiene el comportamiento actual. CPU desactiva la GPU; GPU requiere una versión compatible de llama-server. El modelo se recargará en el siguiente mensaje.'}
+  "en": {
+    "speedMode": "Speed mode (Apple Silicon)",
+    "speedModeHelp": "When enabled, requests full GPU offload, one slot and flash attention. On Macs with 16 GB RAM or less, context is capped at 8,192 tokens. If the optimized server fails to start, LlamaNest retries without speed settings. N-gram speculation is used only when this llama-server supports --spec-type.",
+    "speedModeLimited": "Speed mode limits the effective context to 8,192 tokens on this Mac.",
+    "speedModeFallback": "The optimized server did not start; LlamaNest restarted without speed settings.",
+    "speedSpecUnsupported": "This llama-server does not support --spec-type; n-gram speculation is unavailable.",
+    "gpuLayers": "GPU layers",
+    "inferenceSettings": "Inference settings",
+    "inferenceBackend": "Device",
+    "inferenceThreads": "CPU threads",
+    "inferenceAuto": "Automatic",
+    "inferenceHelp": "Automatic keeps the existing behavior. CPU disables GPU offloading; GPU requests GPU offloading and requires a compatible llama-server build. Changes reload the model on the next message."
+  },
+  "it": {
+    "speedMode": "Modalità velocità (Apple Silicon)",
+    "speedModeHelp": "Attiva l’offload completo sulla GPU, uno slot e flash attention. Sui Mac con 16 GB di RAM o meno, il contesto è limitato a 8.192 token. Se il server ottimizzato non parte, LlamaNest riprova senza queste impostazioni. La speculativa n-grammi si usa solo se questo llama-server supporta --spec-type.",
+    "speedModeLimited": "La modalità velocità limita il contesto effettivo a 8.192 token su questo Mac.",
+    "speedModeFallback": "Il server ottimizzato non si è avviato; LlamaNest lo ha riavviato senza le impostazioni velocità.",
+    "speedSpecUnsupported": "Questo llama-server non supporta --spec-type; la speculativa n-grammi non è disponibile.",
+    "gpuLayers": "Layer GPU",
+    "inferenceSettings": "Impostazioni di inferenza",
+    "inferenceBackend": "Dispositivo",
+    "inferenceThreads": "Thread CPU",
+    "inferenceAuto": "Automatico",
+    "inferenceHelp": "Automatico mantiene il comportamento attuale. CPU disattiva la GPU; GPU richiede l’accelerazione e una versione compatibile di llama-server. Le modifiche ricaricano il modello al prossimo messaggio."
+  },
+  "fr": {
+    "speedMode": "Mode vitesse (Apple Silicon)",
+    "speedModeHelp": "Active le déchargement complet sur GPU, un seul emplacement et Flash Attention. Sur les Mac avec 16 Go de RAM ou moins, le contexte est limité à 8 192 jetons. Si le serveur optimisé ne démarre pas, LlamaNest réessaie sans ces réglages. La spéculation n-grammes est utilisée uniquement si ce llama-server prend en charge --spec-type.",
+    "speedModeLimited": "Le mode vitesse limite le contexte effectif à 8 192 jetons sur ce Mac.",
+    "speedModeFallback": "Le serveur optimisé n’a pas démarré ; LlamaNest l’a relancé sans les réglages de vitesse.",
+    "speedSpecUnsupported": "Ce llama-server ne prend pas en charge --spec-type ; la spéculation n-grammes est indisponible.",
+    "gpuLayers": "Couches GPU",
+    "inferenceSettings": "Paramètres d’inférence",
+    "inferenceBackend": "Périphérique",
+    "inferenceThreads": "Threads CPU",
+    "inferenceAuto": "Automatique",
+    "inferenceHelp": "Automatique conserve le comportement actuel. CPU désactive le GPU ; GPU demande une version compatible de llama-server. Le modèle sera rechargé au prochain message."
+  },
+  "de": {
+    "speedMode": "Geschwindigkeitsmodus (Apple Silicon)",
+    "speedModeHelp": "Aktiviert vollständiges GPU-Offloading, einen Slot und Flash Attention. Auf Macs mit höchstens 16 GB RAM wird der Kontext auf 8.192 Token begrenzt. Falls der optimierte Server nicht startet, versucht LlamaNest es ohne diese Einstellungen erneut. N-Gram-Spekulation wird nur verwendet, wenn dieser llama-server --spec-type unterstützt.",
+    "speedModeLimited": "Der Geschwindigkeitsmodus begrenzt den effektiven Kontext auf diesem Mac auf 8.192 Token.",
+    "speedModeFallback": "Der optimierte Server startete nicht; LlamaNest hat ihn ohne Geschwindigkeitseinstellungen neu gestartet.",
+    "speedSpecUnsupported": "Dieser llama-server unterstützt --spec-type nicht; N-Gram-Spekulation ist nicht verfügbar.",
+    "gpuLayers": "GPU-Layer",
+    "inferenceSettings": "Inferenz-Einstellungen",
+    "inferenceBackend": "Gerät",
+    "inferenceThreads": "CPU-Threads",
+    "inferenceAuto": "Automatisch",
+    "inferenceHelp": "Automatisch behält das bisherige Verhalten bei. CPU deaktiviert die GPU; GPU benötigt eine kompatible llama-server-Version. Das Modell wird bei der nächsten Nachricht neu geladen."
+  },
+  "es": {
+    "speedMode": "Modo velocidad (Apple Silicon)",
+    "speedModeHelp": "Activa la descarga completa en GPU, una ranura y Flash Attention. En Mac con 16 GB de RAM o menos, limita el contexto a 8.192 tokens. Si el servidor optimizado no arranca, LlamaNest vuelve a intentarlo sin estos ajustes. La especulación n-gramas solo se usa si este llama-server admite --spec-type.",
+    "speedModeLimited": "El modo velocidad limita el contexto efectivo a 8.192 tokens en este Mac.",
+    "speedModeFallback": "El servidor optimizado no arrancó; LlamaNest lo reinició sin los ajustes de velocidad.",
+    "speedSpecUnsupported": "Este llama-server no admite --spec-type; la especulación n-gramas no está disponible.",
+    "gpuLayers": "Capas GPU",
+    "inferenceSettings": "Configuración de inferencia",
+    "inferenceBackend": "Dispositivo",
+    "inferenceThreads": "Hilos de CPU",
+    "inferenceAuto": "Automático",
+    "inferenceHelp": "Automático mantiene el comportamiento actual. CPU desactiva la GPU; GPU requiere una versión compatible de llama-server. El modelo se recargará en el siguiente mensaje."
+  }
 };
 for (const language of Object.keys(inferenceSettingsStrings)) Object.assign(window.USB_AI_I18N[language], inferenceSettingsStrings[language]);
 
