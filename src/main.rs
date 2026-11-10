@@ -1506,14 +1506,37 @@ fn model_parts(path: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(parts)
 }
 
+const ASTRA_NAME: &str = "Qwen3.5-0.8B-Astra-WeightEdit.safetensors";
+const ASTRA_DIR: &str = "Qwen3.5-0.8B-Astra-WeightEdit";
+const ASTRA_WEIGHTS: &str = "model.safetensors-00001-of-00001.safetensors";
+
 impl App {
+    fn astra_path(&self) -> Option<PathBuf> {
+        if env::var_os("USB_AI_ASTRA_SERVER").is_none()
+            || env::var_os("USB_AI_ASTRA_PYTHON").is_none()
+        {
+            return None;
+        }
+        let path = self.models.join(ASTRA_DIR);
+        [
+            ASTRA_WEIGHTS,
+            "config.json",
+            "tokenizer.json",
+            "tokenizer_config.json",
+        ]
+        .iter()
+        .all(|name| path.join(name).is_file())
+        .then_some(path)
+    }
     fn prism_only(&self) -> bool {
         self.models
             .parent()
             .is_some_and(|base| base.join("PRISM_ONLY").is_file())
     }
     fn inference_engine(&self) -> &'static str {
-        if self.prism_only() || self.db.inference_engine == "prism" {
+        if self.db.inference_engine == "mlx" && self.selected.as_deref() == Some(ASTRA_NAME) {
+            "mlx"
+        } else if self.prism_only() || self.db.inference_engine == "prism" {
             "prism"
         } else {
             "standard"
@@ -1565,6 +1588,9 @@ impl App {
                 }
             }
         }
+        if self.astra_path().is_some() {
+            out.push(ASTRA_NAME.to_owned());
+        }
         for model in &self.db.external_models {
             if model.path.is_file()
                 && !is_support_model_file(&model.name)
@@ -1597,6 +1623,11 @@ impl App {
         out
     }
     fn model_path(&self, name: &str) -> Result<PathBuf, String> {
+        if name == ASTRA_NAME {
+            return self
+                .astra_path()
+                .ok_or("Safetensors model unavailable".into());
+        }
         if name.contains('/')
             || name.contains('\\')
             || !name.to_ascii_lowercase().ends_with(".gguf")
@@ -1760,7 +1791,7 @@ impl App {
         }).collect::<Vec<_>>();
         json!({"chats":self.db.chats,"memory":self.db.memory,"documents":self.db.documents.iter().map(|d|json!({"id":d.id,"name":d.name,"count":d.chunks.len(),"pageCount":d.page_count,"chatId":d.chat_id})).collect::<Vec<_>>(),
             "models":installed,"modelDetails":model_details,"ignoredModelFiles":self.ignored_model_files(),"modelsDir":self.models,"model":self.selected,"root":self.root,"language":self.language(),"thinking":self.db.thinking,"inferenceBackend":if self.db.inference_backend.is_empty() { "auto" } else { &self.db.inference_backend },"inferenceThreads":self.db.inference_threads,"contextSize":self.db.context_size,"outputLimit":self.db.output_limit,"temperature":self.db.temperature.unwrap_or(0.3),"inferenceEngine":self.inference_engine(),"prismOnly":self.prism_only(),"prismAvailable":prism_server_path().is_some(),"catalog":catalog,"hardware":self.hardware,
-            "download":self.download_status(),"quantizeAvailable":quantize_available(),"quantize":self.quantization.as_ref().map(|job|job.lock().unwrap().status())})
+            "mlxAvailable":self.astra_path().is_some(),"download":self.download_status(),"quantizeAvailable":quantize_available(),"quantize":self.quantization.as_ref().map(|job|job.lock().unwrap().status())})
     }
     fn download_status(&self) -> Value {
         let (download_name, downloaded, total) = if let Some(model) = &self.downloading {
@@ -1864,11 +1895,19 @@ impl App {
             }
             "set-inference-engine" => {
                 let engine = data["engine"].as_str().ok_or("Missing inference engine")?;
-                if !["standard", "prism"].contains(&engine) {
+                if !["standard", "prism", "mlx"].contains(&engine) {
                     return Err("Invalid inference engine".into());
                 }
-                if self.prism_only() && engine != "prism" {
+                if self.prism_only() && !["prism", "mlx"].contains(&engine) {
                     return Err("This package uses the PrismML engine only".into());
+                }
+                if engine == "mlx"
+                    && (self.astra_path().is_none() || self.selected.as_deref() != Some(ASTRA_NAME))
+                {
+                    return Err("Select the included Astra Safetensors model to use MLX".into());
+                }
+                if self.selected.as_deref() == Some(ASTRA_NAME) && engine != "mlx" {
+                    return Err("Select a GGUF model before switching away from MLX".into());
                 }
                 if engine == "prism" && prism_server_path().is_none() {
                     return Err("PrismML engine is not installed".into());
@@ -1923,16 +1962,30 @@ impl App {
             "select-model" => {
                 let name = data["name"].as_str().ok_or("Nome mancante")?;
                 let path = self.model_path(name)?;
-                let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
-                let mut head = [0; 4];
-                file.read_exact(&mut head).map_err(|e| e.to_string())?;
-                if &head != b"GGUF" {
-                    return Err("File GGUF non valido".into());
+                if name != ASTRA_NAME {
+                    let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
+                    let mut head = [0; 4];
+                    file.read_exact(&mut head).map_err(|e| e.to_string())?;
+                    if &head != b"GGUF" {
+                        return Err("File GGUF non valido".into());
+                    }
                 }
                 if self.selected.as_deref() != Some(name) {
                     self.inference = None;
                 }
                 self.selected = Some(name.to_owned());
+                if name == ASTRA_NAME {
+                    self.db.inference_engine = "mlx".to_owned();
+                    self.save()?;
+                } else if self.db.inference_engine == "mlx" {
+                    self.db.inference_engine = if self.prism_only() {
+                        "prism"
+                    } else {
+                        "standard"
+                    }
+                    .to_owned();
+                    self.save()?;
+                }
                 Ok(self.state())
             }
             "new-chat" => {
@@ -2270,10 +2323,14 @@ impl App {
         }
         if self.inference.is_none() {
             let mut load_error = String::new();
-            let modes: &[bool] = match self.db.inference_backend.as_str() {
-                "cpu" => &[true],
-                "gpu" => &[false],
-                _ => &[false, true],
+            let modes: &[bool] = if model.is_dir() {
+                &[false]
+            } else {
+                match self.db.inference_backend.as_str() {
+                    "cpu" => &[true],
+                    "gpu" => &[false],
+                    _ => &[false, true],
+                }
             };
             for &cpu_only in modes {
                 if cpu_only && env::var_os("USB_AI_REQUIRE_GPU").is_some_and(|value| value == "1") {
@@ -2283,46 +2340,67 @@ impl App {
                     .map_err(|e| format!("llama-server: {e}"))?;
                 let port = listener.local_addr().map_err(|e| e.to_string())?.port();
                 drop(listener);
+                let astra =
+                    model.is_dir() && model.file_name().is_some_and(|name| name == ASTRA_DIR);
                 let prism = self.inference_engine() == "prism";
-                let server_path = if prism {
-                    prism_server_path().ok_or("PrismML engine is not installed")?
+                let mut command;
+                if astra {
+                    command = Command::new(
+                        env::var_os("USB_AI_ASTRA_PYTHON")
+                            .ok_or("Safetensors runtime unavailable")?,
+                    );
+                    command
+                        .arg(
+                            env::var_os("USB_AI_ASTRA_SERVER")
+                                .ok_or("Safetensors server unavailable")?,
+                        )
+                        .args(["--port", &port.to_string(), "--model"])
+                        .arg(model);
                 } else {
-                    tool_path("LLAMA_SERVER", "llama-server")
-                };
-                let mut command = Command::new(server_path);
-                if prism {
-                    command.args(["--cors-origins", "http://127.0.0.1:0"]);
-                }
-                command
-                    .args(["--host", "127.0.0.1", "--port", &port.to_string(), "-m"])
-                    .arg(model)
-                    .args([
-                        "-c",
-                        &if self.db.context_size == 0 {
-                            8192
-                        } else {
-                            self.db.context_size
-                        }
-                        .to_string(),
-                        "--no-webui",
-                    ]);
-                if is_qwen35(model) {
-                    command.arg("--jinja");
-                }
-                if self.db.inference_threads > 0 {
-                    command.args(["--threads", &self.db.inference_threads.to_string()]);
-                }
-                if cpu_only {
-                    command.args(["--device", "none", "-ngl", "0"]);
-                } else if self.db.inference_backend == "gpu"
-                    || env::var_os("USB_AI_GPU").is_some_and(|value| value == "1")
-                {
-                    command.args(["-ngl", "999"]);
+                    let server_path = if prism {
+                        prism_server_path().ok_or("PrismML engine is not installed")?
+                    } else {
+                        tool_path("LLAMA_SERVER", "llama-server")
+                    };
+                    command = Command::new(server_path);
+                    if prism {
+                        command.args(["--cors-origins", "http://127.0.0.1:0"]);
+                    }
+                    command
+                        .args(["--host", "127.0.0.1", "--port", &port.to_string(), "-m"])
+                        .arg(model)
+                        .args([
+                            "-c",
+                            &if self.db.context_size == 0 {
+                                8192
+                            } else {
+                                self.db.context_size
+                            }
+                            .to_string(),
+                            "--no-webui",
+                        ]);
+                    if is_qwen35(model) {
+                        command.arg("--jinja");
+                    }
+                    if self.db.inference_threads > 0 {
+                        command.args(["--threads", &self.db.inference_threads.to_string()]);
+                    }
+                    if cpu_only {
+                        command.args(["--device", "none", "-ngl", "0"]);
+                    } else if self.db.inference_backend == "gpu"
+                        || env::var_os("USB_AI_GPU").is_some_and(|value| value == "1")
+                    {
+                        command.args(["-ngl", "999"]);
+                    }
                 }
                 let child = match command
                     .stdin(Stdio::null())
                     .stdout(Stdio::null())
-                    .stderr(Stdio::null())
+                    .stderr(if astra {
+                        Stdio::inherit()
+                    } else {
+                        Stdio::null()
+                    })
                     .spawn()
                 {
                     Ok(child) => child,
