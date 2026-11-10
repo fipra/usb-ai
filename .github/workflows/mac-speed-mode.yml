@@ -1,0 +1,46 @@
+name: Mac Apple Silicon speed mode experiment
+on:
+  workflow_dispatch:
+  push:
+    branches: [experiment/speed-mode]
+    paths: [.github/workflows/mac-speed-mode.yml, 'src/**', 'web/**', 'scripts/benchmark-speed-mode.py', 'esperimenti/index.html', 'Cargo.toml', 'Cargo.lock']
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install inference tools
+        run: brew install llama.cpp poppler
+      - name: Build and verify speed-mode package
+        run: |
+          cargo fmt --check
+          cargo test --locked
+          cargo build --release --locked
+          python3 scripts/package-mac.py
+          folder="release/USB-AI-Rust-mac-arm64"
+          test -x "$folder/bin/llama-server"
+          help="$("$folder/bin/llama-server" --help 2>&1 || true)"
+          for flag in '-ngl' '-np' '-fa'; do
+            [[ "$help" == *"$flag"* ]] || { echo "Packaged llama-server lacks $flag" >&2; exit 1; }
+          done
+          printf '%s\n' "$help" > "$RUNNER_TEMP/llama-server-help.txt"
+          ditto -c -k --sequesterRsrc --keepParent "$folder" LlamaNest-Speed-Mode-Mac-Apple-Silicon.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LlamaNest-Speed-Mode-Mac-Apple-Silicon
+          path: LlamaNest-Speed-Mode-Mac-Apple-Silicon.zip
+          if-no-files-found: error
+      - name: Publish experimental package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag='mac-speed-mode-experiment'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" LlamaNest-Speed-Mode-Mac-Apple-Silicon.zip --clobber
+          else
+            gh release create "$tag" LlamaNest-Speed-Mode-Mac-Apple-Silicon.zip --target "$GITHUB_SHA" --title 'LlamaNest Mac Apple Silicon — Speed mode experiment' --notes 'Experimental Apple Silicon package. Speed mode is optional and disabled by default. Enable it in Models → Inference settings. llama-server stderr is written to PocketAI-data/llama-server-speed.log. Model weights are not included.' --prerelease
+          fi
