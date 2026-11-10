@@ -1,0 +1,87 @@
+name: PrismML and MLX Mac experiment
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/prism-mlx-mac-experiment.yml'
+      - 'src/**'
+      - 'web/**'
+      - 'scripts/astra-*'
+      - 'scripts/test-prism-mlx-state.py'
+      - 'ASTRA-EXPERIMENT.md'
+      - 'esperimenti/index.html'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  push:
+    branches: [experiment/prism-mlx-current]
+    paths:
+      - '.github/workflows/prism-mlx-mac-experiment.yml'
+      - 'src/**'
+      - 'web/**'
+      - 'scripts/astra-*'
+      - 'scripts/test-prism-mlx-state.py'
+      - 'ASTRA-EXPERIMENT.md'
+      - 'esperimenti/index.html'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test the Rust application
+        run: |
+          cargo fmt --check
+          cargo test --locked
+          cargo build --release --locked
+      - name: Download the corrected Prism package
+        run: |
+          curl -fL --retry 3 'https://github.com/fipra/usb-ai/releases/download/prism-mac-permessi-1be1beb5b40e299c0716d493b5faf5a72a5f31ee/LlamaNest-Prism-Mac-permessi-corretti.zip' -o "$RUNNER_TEMP/prism.zip"
+          mkdir -p "$RUNNER_TEMP/prism"
+          ditto -x -k "$RUNNER_TEMP/prism.zip" "$RUNNER_TEMP/prism"
+          server="$(find "$RUNNER_TEMP/prism" -type f -name usb-ai-rust -print -quit)"
+          test -n "$server"
+          package="$(dirname "$(dirname "$server")")"
+          test -f "$package/PRISM_ONLY"
+          test -f "$package/bin/prism/llama-server"
+          cp target/release/usb-ai-rust "$server"
+          chmod 755 "$server"
+          codesign --force --sign - "$server"
+          codesign --verify --strict "$server"
+          cp scripts/astra-safetensors-server.py "$package/bin/astra-safetensors-server.py"
+          chmod 755 "$package/bin/astra-safetensors-server.py"
+          cp scripts/astra-launcher.command "$package/Avvia LlamaNest.command"
+          chmod 755 "$package/Avvia LlamaNest.command"
+          cp ASTRA-EXPERIMENT.md "$package/LEGGIMI-MLX.txt"
+          ditto -c -k --sequesterRsrc --keepParent "$package" LlamaNest-Prism-MLX-Mac-Apple-Silicon.zip
+          ditto -x -k LlamaNest-Prism-MLX-Mac-Apple-Silicon.zip "$RUNNER_TEMP/check"
+          test -x "$RUNNER_TEMP/check/$(basename "$package")/Avvia LlamaNest.command"
+          test -x "$RUNNER_TEMP/check/$(basename "$package")/bin/astra-safetensors-server.py"
+          test -x "$RUNNER_TEMP/check/$(basename "$package")/bin/prism/llama-server"
+          test -f "$RUNNER_TEMP/check/$(basename "$package")/PRISM_ONLY"
+      - name: Verify app startup and PrismML detection
+        run: |
+          package="$(find "$RUNNER_TEMP/check" -type f -name usb-ai-rust -print -quit | xargs dirname | xargs dirname)"
+          python3 scripts/test-official-mac-launch.py "$package"
+      - name: Verify Astra routes to MLX
+        run: |
+          package="$(find "$RUNNER_TEMP/check" -type f -name usb-ai-rust -print -quit | xargs dirname | xargs dirname)"
+          python3 scripts/test-prism-mlx-state.py "$package"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LlamaNest-Prism-MLX-Mac-Apple-Silicon
+          path: LlamaNest-Prism-MLX-Mac-Apple-Silicon.zip
+          if-no-files-found: error
+      - name: Publish experimental download
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag=prism-mlx-mac-experimental-2026-11-10
+          if ! gh release create "$tag" LlamaNest-Prism-MLX-Mac-Apple-Silicon.zip --target "$GITHUB_SHA" --title 'LlamaNest PrismML + MLX per Mac (esperimento)' --notes-file ASTRA-EXPERIMENT.md; then
+            gh release upload "$tag" LlamaNest-Prism-MLX-Mac-Apple-Silicon.zip --clobber
+          fi
