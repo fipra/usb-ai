@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 9938)
-Total output lines: 180
-
 window.USB_AI_I18N = {
   en: {
     localModelsPath:'Copy GGUF models to:', refreshModels:'Refresh local models', mmprojInfo:'These mmproj files are vision components, not chat models. Copy the main model GGUF as well:',
@@ -31,7 +28,43 @@ Object.assign(window.USB_AI_I18N.es, {laboratory:'Laboratorio'});
 const simpleHubStrings = {
   en: { hubSearchTitle:'Find a model', hubSearchNote:'Enter a model name. LlamaNest selects one complete downloadable version per model and checks the download.', hubSearchPlaceholder:'Model name…', hubNoResults:'No compatible model found on this page.' },
   it: { hubSearchTitle:'Trova un modello', hubSearchNote:'Scrivi il nome di un modello. LlamaNest sceglie una versione completa da scaricare e verifica il download.', hubSearchPlaceholder:'Nome del modello…', hubNoResults:'Nessun modello compatibile in questa pagina.' },
-  de: { hubSearchTitle:'Modell finden', hubSearchNote:'Gib einen Modellnamen ein. LlamaNest wählt eine vollständige Version und prüft den Download.',…1938 tokens truncated…], memoryStrings[language]);
+  de: { hubSearchTitle:'Modell finden', hubSearchNote:'Gib einen Modellnamen ein. LlamaNest wählt eine vollständige Version und prüft den Download.', hubSearchPlaceholder:'Modellname…', hubNoResults:'Auf dieser Seite kein kompatibles Modell gefunden.' },
+  fr: { hubSearchTitle:'Trouver un modèle', hubSearchNote:'Saisissez un nom. LlamaNest choisit une version complète et vérifie le téléchargement.', hubSearchPlaceholder:'Nom du modèle…', hubNoResults:'Aucun modèle compatible sur cette page.' },
+  es: { hubSearchTitle:'Buscar un modelo', hubSearchNote:'Escribe un nombre. LlamaNest elige una versión completa y verifica la descarga.', hubSearchPlaceholder:'Nombre del modelo…', hubNoResults:'No hay modelos compatibles en esta página.' }
+};
+for (const language of Object.keys(window.USB_AI_I18N)) Object.assign(window.USB_AI_I18N[language], simpleHubStrings[language]);
+const starterStrings = {
+  en: { starterHint:'Write your first message. Llama 3.2 1B will download and start automatically.', starterDownloading:'Downloading the starter model…', starterPreparing:'Preparing the model…', modelLlama:'Starter model for private chat and documents.' },
+  it: { starterHint:'Scrivi il primo messaggio. Llama 3.2 1B verrà scaricato e avviato automaticamente.', starterDownloading:'Scaricamento del modello iniziale…', starterPreparing:'Preparazione del modello…', modelLlama:'Modello iniziale per chat e documenti privati.' },
+  de: { starterHint:'Schreibe deine erste Nachricht. Llama 3.2 1B wird automatisch heruntergeladen und gestartet.', starterDownloading:'Startmodell wird heruntergeladen…', starterPreparing:'Modell wird vorbereitet…', modelLlama:'Startmodell für private Chats und Dokumente.' },
+  fr: { starterHint:'Écrivez votre premier message. Llama 3.2 1B sera téléchargé et lancé automatiquement.', starterDownloading:'Téléchargement du modèle initial…', starterPreparing:'Préparation du modèle…', modelLlama:'Modèle initial pour les discussions et documents privés.' },
+  es: { starterHint:'Escribe tu primer mensaje. Llama 3.2 1B se descargará e iniciará automáticamente.', starterDownloading:'Descargando el modelo inicial…', starterPreparing:'Preparando el modelo…', modelLlama:'Modelo inicial para chat y documentos privados.' }
+};
+for (const language of Object.keys(window.USB_AI_I18N)) Object.assign(window.USB_AI_I18N[language], starterStrings[language]);
+const prismStarterHints = {
+  en:'Write your first message. Ternary Bonsai 2 9B will download automatically (2.42 GB) and start with PrismML.',
+  it:'Scrivi il primo messaggio. Ternary Bonsai 2 9B verrà scaricato automaticamente (2,42 GB) e avviato con PrismML.',
+  de:'Schreibe deine erste Nachricht. Ternary Bonsai 2 9B wird automatisch heruntergeladen (2,42 GB) und mit PrismML gestartet.',
+  fr:'Écrivez votre premier message. Ternary Bonsai 2 9B sera téléchargé automatiquement (2,42 Go) et lancé avec PrismML.',
+  es:'Escribe tu primer mensaje. Ternary Bonsai 2 9B se descargará automáticamente (2,42 GB) y se iniciará con PrismML.'
+};
+for (const language of Object.keys(prismStarterHints)) window.USB_AI_I18N[language].prismStarterHint = prismStarterHints[language];
+const firstModelStrings = {
+  en: { firstModelTitle:'Choose how to start', firstModelExplanation:'Import a GGUF already on this computer into the models folder, or download the suggested model.', useExistingModel:'Import an existing GGUF', importModel:'Import GGUF into models', importingModel:'Importing model into models…', downloadStarterModel:'Download the suggested model' },
+  it: { firstModelTitle:'Scegli come iniziare', firstModelExplanation:'Importa un GGUF già sul computer nella cartella models, oppure scarica il modello consigliato.', useExistingModel:'Importa un GGUF già presente', importModel:'Importa GGUF in models', importingModel:'Importazione del modello in models…', downloadStarterModel:'Scarica il modello consigliato' },
+  de: { firstModelTitle:'So möchtest du beginnen', firstModelExplanation:'Importiere eine vorhandene GGUF-Datei in den Ordner models oder lade das empfohlene Modell herunter.', useExistingModel:'Vorhandenes GGUF importieren', importModel:'GGUF in models importieren', importingModel:'Modell wird in models importiert…', downloadStarterModel:'Empfohlenes Modell herunterladen' },
+  fr: { firstModelTitle:'Choisissez comment commencer', firstModelExplanation:'Importez un GGUF déjà présent dans le dossier models ou téléchargez le modèle conseillé.', useExistingModel:'Importer un GGUF existant', importModel:'Importer un GGUF dans models', importingModel:'Importation du modèle dans models…', downloadStarterModel:'Télécharger le modèle conseillé' },
+  es: { firstModelTitle:'Elige cómo empezar', firstModelExplanation:'Importa un GGUF ya guardado a la carpeta models o descarga el modelo recomendado.', useExistingModel:'Importar un GGUF existente', importModel:'Importar GGUF a models', importingModel:'Importando el modelo a models…', downloadStarterModel:'Descargar el modelo recomendado' }
+};
+for (const language of Object.keys(window.USB_AI_I18N)) Object.assign(window.USB_AI_I18N[language], firstModelStrings[language]);
+const memoryStrings = {
+  en: { rememberCorrection:'Correct and remember', memory:'Memory', memoryIntro:'Save only corrections and preferences you approve. Put /salva before or after a note in chat, then confirm here. Relevant notes are used in future chats.', memoryPlaceholder:'For this project, remember that…', memorySave:'Save note', memorySaved:'Memory note saved.', memoryEdit:'Edit', memoryEmpty:'No saved notes yet.', memoryPath:'Markdown copy:', removeMemory:'Remove note' },
+  it: { rememberCorrection:'Correggi e ricorda', memory:'Memoria', memoryIntro:'Salva solo correzioni e preferenze che approvi. Scrivi /salva prima o dopo la nota nella chat, poi conferma qui. Le note pertinenti saranno usate nelle chat future.', memoryPlaceholder:'Per questo progetto, ricorda che…', memorySave:'Salva nota', memorySaved:'Nota salvata in memoria.', memoryEdit:'Modifica', memoryEmpty:'Nessuna nota salvata.', memoryPath:'Copia Markdown:', removeMemory:'Elimina nota' },
+  de: { rememberCorrection:'Korrigieren und merken', memory:'Gedächtnis', memoryIntro:'Speichere nur bestätigte Korrekturen und Vorlieben. Gib /salva vor oder nach der Notiz im Chat ein und bestätige sie hier. Passende Notizen werden in künftigen Chats verwendet.', memoryPlaceholder:'Für dieses Projekt merken…', memorySave:'Notiz speichern', memorySaved:'Notiz gespeichert.', memoryEdit:'Bearbeiten', memoryEmpty:'Noch keine Notizen gespeichert.', memoryPath:'Markdown-Kopie:', removeMemory:'Notiz entfernen' },
+  fr: { rememberCorrection:'Corriger et mémoriser', memory:'Mémoire', memoryIntro:'Enregistrez uniquement les corrections et préférences approuvées. Placez /salva avant ou après la note dans la discussion, puis confirmez ici. Les notes pertinentes seront utilisées dans les prochaines discussions.', memoryPlaceholder:'Pour ce projet, retiens que…', memorySave:'Enregistrer la note', memorySaved:'Note enregistrée en mémoire.', memoryEdit:'Modifier', memoryEmpty:'Aucune note enregistrée.', memoryPath:'Copie Markdown :', removeMemory:'Supprimer la note' },
+  es: { rememberCorrection:'Corregir y recordar', memory:'Memoria', memoryIntro:'Guarda solo correcciones y preferencias que apruebes. Escribe /salva antes o después de la nota en el chat y confírmala aquí. Las notas pertinentes se usarán en futuros chats.', memoryPlaceholder:'Para este proyecto, recuerda que…', memorySave:'Guardar nota', memorySaved:'Nota guardada en memoria.', memoryEdit:'Editar', memoryEmpty:'Aún no hay notas guardadas.', memoryPath:'Copia Markdown:', removeMemory:'Eliminar nota' }
+};
+for (const language of Object.keys(window.USB_AI_I18N)) Object.assign(window.USB_AI_I18N[language], memoryStrings[language]);
 
 const attachmentStrings = {
   en: {'attachFiles': 'Attach files', 'noChatDocs': 'No files in this chat yet.', 'legacyDocs': 'Documents imported before this update', 'attachToChat': 'Attach to this chat', 'docsHint': 'Files in this chat are used automatically. Local data:'},
@@ -197,9 +230,3 @@ for (const language of Object.keys(generationOptionStrings)) Object.assign(windo
 
 const correctionLengthStrings = {"en": "Edit the response before saving. Notes can contain up to 16,000 characters.", "it": "Modifica la risposta prima di salvarla. Le note possono contenere fino a 16.000 caratteri.", "fr": "Modifiez la réponse avant de l’enregistrer. Les notes peuvent contenir jusqu’à 16 000 caractères.", "de": "Bearbeite die Antwort vor dem Speichern. Notizen können bis zu 16.000 Zeichen enthalten.", "es": "Edita la respuesta antes de guardarla. Las notas pueden contener hasta 16.000 caracteres."};
 for (const language of Object.keys(correctionLengthStrings)) window.USB_AI_I18N[language].memoryLengthHint = correctionLengthStrings[language];
-
-Object.assign(window.USB_AI_I18N.en,{astraGpuNote:"Experimental: Astra Safetensors uses MLX and the Apple GPU. GGUF models use the selected engine.",engineMlx:"MLX (Apple GPU)",mlxEngineHelp:"MLX is available for the included Astra Safetensors model on Apple Silicon. GGUF models use PrismML."});
-Object.assign(window.USB_AI_I18N.it,{astraGpuNote:"Sperimentale: il modello Astra Safetensors usa MLX e la GPU Apple. I modelli GGUF usano il motore selezionato.",engineMlx:"MLX (GPU Apple)",mlxEngineHelp:"MLX è disponibile per il modello Astra Safetensors incluso su Apple Silicon. I modelli GGUF usano PrismML."});
-Object.assign(window.USB_AI_I18N.fr,{astraGpuNote:"Expérimental : Astra Safetensors utilise MLX et le GPU Apple. Les modèles GGUF utilisent le moteur choisi.",engineMlx:"MLX (GPU Apple)",mlxEngineHelp:"MLX est disponible pour le modèle Astra Safetensors inclus sur Apple Silicon. Les modèles GGUF utilisent PrismML."});
-Object.assign(window.USB_AI_I18N.de,{astraGpuNote:"Experimentell: Astra Safetensors nutzt MLX und die Apple-GPU. GGUF-Modelle nutzen die gewählte Engine.",engineMlx:"MLX (Apple-GPU)",mlxEngineHelp:"MLX ist für das enthaltene Astra-Safetensors-Modell auf Apple Silicon verfügbar. GGUF-Modelle nutzen PrismML."});
-Object.assign(window.USB_AI_I18N.es,{astraGpuNote:"Experimental: Astra Safetensors usa MLX y la GPU de Apple. Los modelos GGUF usan el motor seleccionado.",engineMlx:"MLX (GPU de Apple)",mlxEngineHelp:"MLX está disponible para el modelo Astra Safetensors incluido en Apple Silicon. Los modelos GGUF usan PrismML."});
