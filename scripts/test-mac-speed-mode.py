@@ -46,7 +46,12 @@ def main():
             errors = ("failed to initialize MTL", "failed to build 'unary'", "failed to create_context")
             if any(error in text for error in errors):
                 raise RuntimeError("Metal backend emitted initialization errors")
+            import re
+            gpu_layers = re.search(r"offloaded\s+(\d+/\d+)\s+layers to GPU", text, re.IGNORECASE)
+            if not gpu_layers:
+                raise RuntimeError("llama-server did not confirm GPU layer offload")
             print(json.dumps({"metalSmokeTest": "passed",
+                              "gpuLayers": gpu_layers.group(1),
                               "outputTokens": result["timings"]["predicted_n"],
                               "tokensPerSecond": result["timings"].get("predicted_per_second")}))
         except Exception:
