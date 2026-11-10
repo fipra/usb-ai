@@ -784,6 +784,9 @@ fn speed_mode_args(help: &str, effective_context: u32) -> Vec<String> {
     if help.contains("--flash-attn") {
         args.extend(["-fa".into(), "on".into()]);
     }
+    if help.contains("-lv,") || help.contains("--verbosity") {
+        args.extend(["-lv".into(), "5".into()]);
+    }
     args.extend(["-c".into(), effective_context.to_string()]);
     if help.contains("--spec-type") {
         args.extend(["--spec-type".into(), "ngram-simple".into()]);
@@ -801,13 +804,38 @@ fn effective_context(requested: u32, ram_gb: Option<f64>, speed_mode: bool) -> u
 }
 
 fn gpu_layers_from_log(text: &str) -> Option<String> {
-    text.lines().find_map(|line| {
+    if let Some(offloaded) = text.lines().find_map(|line| {
         let lower = line.to_ascii_lowercase();
         let start = lower.find("offloaded ")? + "offloaded ".len();
         let tail = &line[start..];
         let end = tail.to_ascii_lowercase().find(" layers")?;
         Some(tail[..end].trim().to_owned())
-    })
+    }) {
+        return Some(offloaded);
+    }
+
+    let mut metal_layers = std::collections::HashSet::new();
+    for line in text.lines() {
+        let lower = line.to_ascii_lowercase();
+        let Some((_, assignment)) = lower.split_once("load_tensors: layer") else {
+            continue;
+        };
+        let layer = assignment
+            .trim_start()
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .collect::<String>();
+        let Some(layer) = layer.parse::<usize>().ok() else {
+            continue;
+        };
+        let Some((_, device)) = assignment.split_once("assigned to device") else {
+            continue;
+        };
+        if device.trim_start().starts_with("metal") {
+            metal_layers.insert(layer);
+        }
+    }
+    (!metal_layers.is_empty()).then(|| metal_layers.len().to_string())
 }
 
 struct ActiveGeneration {
@@ -3789,8 +3817,11 @@ mod tests {
             ]
         );
         assert_eq!(
-            speed_mode_args("-ngl N\n-np, --parallel N\n-fa, --flash-attn on|off", 4096),
-            vec!["-ngl", "999", "-np", "1", "-fa", "on", "-c", "4096"]
+            speed_mode_args(
+                "-ngl N\n-np, --parallel N\n-fa, --flash-attn on|off\n-lv, --verbosity N",
+                4096
+            ),
+            vec!["-ngl", "999", "-np", "1", "-fa", "on", "-lv", "5", "-c", "4096"]
         );
         assert_eq!(effective_context(65536, Some(16.0), true), 8192);
         assert_eq!(effective_context(65536, Some(24.0), true), 65536);
@@ -3801,6 +3832,10 @@ mod tests {
         assert_eq!(
             gpu_layers_from_log("llama_model_loader: offloaded 28/29 layers to GPU"),
             Some("28/29".into())
+        );
+        assert_eq!(
+            gpu_layers_from_log("load_tensors: layer   2 assigned to device Metal0, is_swa = 0\nload_tensors: layer   4 assigned to device Metal0, is_swa = 0"),
+            Some("2".into())
         );
         assert_eq!(gpu_layers_from_log("server ready"), None);
     }

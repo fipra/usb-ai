@@ -17,7 +17,7 @@ def main():
     log = Path("speed-mode-metal-smoke.log")
     command = [str(server), "--host", "127.0.0.1", "--port", str(port),
                "-m", str(model), "-c", "1024", "--no-webui",
-               "-ngl", "999", "-np", "1", "-fa", "on"]
+               "-ngl", "999", "-np", "1", "-fa", "on", "-lv", "5"]
     with log.open("w", encoding="utf-8") as output:
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=output)
         try:

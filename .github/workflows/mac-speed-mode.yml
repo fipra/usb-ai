@@ -47,7 +47,7 @@ jobs:
           folder="release/USB-AI-Rust-mac-arm64"
           test -x "$folder/bin/llama-server"
           help="$("$folder/bin/llama-server" --help 2>&1 || true)"
-          for flag in '-ngl' '-np' '-fa'; do
+          for flag in '-ngl' '-np' '-fa' '-lv'; do
             [[ "$help" == *"$flag"* ]] || { echo "Packaged llama-server lacks $flag" >&2; exit 1; }
           done
           printf '%s\n' "$help" > "$RUNNER_TEMP/llama-server-help.txt"
