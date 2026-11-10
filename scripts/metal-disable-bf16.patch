@@ -1,7 +1,7 @@
 diff --git a/ggml/src/ggml-metal/ggml-metal-device.m b/ggml/src/ggml-metal/ggml-metal-device.m
 --- a/ggml/src/ggml-metal/ggml-metal-device.m
 +++ b/ggml/src/ggml-metal/ggml-metal-device.m
-@@ -456,7 +456,7 @@ ggml_metal_library_t ggml_metal_library_init(ggml_metal_device_t dev) {
+@@ -456,8 +456,7 @@ ggml_metal_library_t ggml_metal_library_init(ggml_metal_device_t dev) {
      // shared MTLCompileOptions preprocessor macros (matches the build-time defines)
      NSMutableDictionary * prep = [NSMutableDictionary dictionary];
 -    if (ggml_metal_device_get_props(dev)->has_bfloat) {
