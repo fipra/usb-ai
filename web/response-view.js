@@ -1,11 +1,11 @@
 (function () {
   'use strict';
   const labels = {
-    en: ['Thinking', 'Input', 'Output', 'tokens/s'],
-    it: ['Ragionamento', 'Input', 'Output', 'token/s'],
-    fr: ['Raisonnement', 'Entrée', 'Sortie', 'jetons/s'],
-    de: ['Gedankengang', 'Eingabe', 'Ausgabe', 'Token/s'],
-    es: ['Razonamiento', 'Entrada', 'Salida', 'tokens/s']
+    en: ['Thinking', 'Input', 'Output', 'tokens/s', 'GPU layers'],
+    it: ['Ragionamento', 'Input', 'Output', 'token/s', 'Layer GPU'],
+    fr: ['Raisonnement', 'Entrée', 'Sortie', 'jetons/s', 'Couches GPU'],
+    de: ['Gedankengang', 'Eingabe', 'Ausgabe', 'Token/s', 'GPU-Layer'],
+    es: ['Razonamiento', 'Entrada', 'Salida', 'tokens/s', 'Capas GPU']
   };
   function splitThinking(text) {
     let value = String(text || '');
@@ -46,7 +46,8 @@
       const meta = document.createElement('div');
       meta.className = 'message-usage';
       const speed = Number.isFinite(usage.tokensPerSecond) ? ` · ${usage.tokensPerSecond.toFixed(1)} ${speedLabel}` : '';
-      meta.textContent = `${inputLabel} ${usage.inputTokens} · ${outputLabel} ${usage.outputTokens}${speed}`;
+      const gpu = usage.gpuLayers ? ` · ${labels[language]?.[4] || 'GPU layers'} ${usage.gpuLayers}` : '';
+      meta.textContent = `${inputLabel} ${usage.inputTokens} · ${outputLabel} ${usage.outputTokens}${speed}${gpu}`;
       container.append(meta);
     }
   }
