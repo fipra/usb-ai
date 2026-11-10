@@ -851,6 +851,19 @@ fn write_stream_response(
     writer.flush()
 }
 
+fn respond_api_json(request: tiny_http::Request, result: Result<Value, String>) {
+    let (code, body) = match result {
+        Ok(value) => (200, serde_json::to_vec(&value).unwrap()),
+        Err(error) => (400, serde_json::to_vec(&json!({"error":error})).unwrap()),
+    };
+    let response = Response::from_data(body)
+        .with_status_code(StatusCode(code))
+        .with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
+        .with_header(Header::from_bytes("Cache-Control", "no-store").unwrap())
+        .with_header(Header::from_bytes("X-Content-Type-Options", "nosniff").unwrap());
+    let _ = request.respond(response);
+}
+
 fn read_completion_stream(
     reader: impl BufRead,
     answer: &mut String,
@@ -3610,9 +3623,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .ok_or_else(|| "Scegli un modello".to_owned())
                                 .and_then(|model_id| start_download(app.clone(), model_id))
                         } else {
-                            app.try_lock()
-                                .map_err(|_| "Busy".to_owned())
-                                .and_then(|mut guard| guard.command(&action, v))
+                            let app = app.clone();
+                            thread::spawn(move || {
+                                let result = app.lock().unwrap().command(&action, v);
+                                respond_api_json(request, result);
+                            });
+                            continue;
                         }
                     }
                     Err(e) => Err(e.to_string()),
