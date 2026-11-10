@@ -44,6 +44,8 @@ def main():
                 raise RuntimeError(f"llama-server returned no generated tokens: {result}")
             text = log.read_text(errors="replace")
             errors = ("failed to initialize MTL", "failed to build 'unary'", "failed to create_context")
+            if "using embedded metal library" not in text:
+                raise RuntimeError("llama-server did not load the embedded Metal library")
             if any(error in text for error in errors):
                 raise RuntimeError("Metal backend emitted initialization errors")
             print(json.dumps({"metalSmokeTest": "passed",
