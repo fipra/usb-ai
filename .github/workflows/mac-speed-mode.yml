@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [experiment/speed-mode]
-    paths: [.github/workflows/mac-speed-mode.yml, 'src/**', 'web/**', 'scripts/benchmark-speed-mode.py', 'esperimenti/index.html', 'Cargo.toml', 'Cargo.lock']
+    paths: [.github/workflows/mac-speed-mode.yml, 'src/**', 'web/**', 'scripts/benchmark-speed-mode.py', 'scripts/test-mac-speed-mode.py', 'esperimenti/index.html', 'Cargo.toml', 'Cargo.lock']
 permissions:
   contents: write
 jobs:
@@ -12,10 +12,33 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: Install inference tools
-        run: brew install llama.cpp poppler
+      - name: Install PDF tools
+        run: brew install poppler
+      - name: Build llama.cpp with an embedded Metal library
+        run: |
+          set -eu
+          source="$RUNNER_TEMP/llama.cpp"
+          build="$source/build"
+          install="$RUNNER_TEMP/llama-install"
+          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$source"
+          git -C "$source" checkout 8642541b255bfb5dc39cd351a178be09013a55d6
+          cmake -S "$source" -B "$build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$install" \
+            -DGGML_METAL=ON \
+            -DGGML_METAL_EMBED_LIBRARY=ON \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_EXAMPLES=OFF \
+            -DLLAMA_BUILD_TOOLS=ON \
+            -DLLAMA_BUILD_SERVER=ON \
+            -DLLAMA_CURL=OFF
+          cmake --build "$build" --parallel 3
+          cmake --install "$build"
+          for tool in llama-server llama-cli llama-quantize; do test -x "$install/bin/$tool"; done
+          echo "$install/bin" >> "$GITHUB_PATH"
       - name: Build and verify speed-mode package
         run: |
+          set -eu
           cargo fmt --check
           cargo test --locked
           cargo build --release --locked
@@ -27,7 +50,14 @@ jobs:
             [[ "$help" == *"$flag"* ]] || { echo "Packaged llama-server lacks $flag" >&2; exit 1; }
           done
           printf '%s\n' "$help" > "$RUNNER_TEMP/llama-server-help.txt"
-          ditto -c -k --sequesterRsrc --keepParent "$folder" LlamaNest-Speed-Mode-Mac-Apple-Silicon.zip
+      - name: Download a hash-verified smoke model
+        run: |
+          curl -fL --retry 3 --connect-timeout 30 'https://huggingface.co/QuantFactory/SmolLM2-135M-Instruct-GGUF/resolve/476854d00ede130660aba430d15f9347ad2e7d0e/SmolLM2-135M-Instruct.Q4_K_M.gguf' -o "$RUNNER_TEMP/smoke.gguf"
+          echo '8030f04528538d47bda434f6f0bdf3952c40a58123e4d5e755332f23731a8684  '"$RUNNER_TEMP/smoke.gguf" | shasum -a 256 -c -
+      - name: Verify full GPU inference without Metal runtime compilation failure
+        run: python3 scripts/test-mac-speed-mode.py release/USB-AI-Rust-mac-arm64/bin/llama-server "$RUNNER_TEMP/smoke.gguf"
+      - name: Create portable ZIP
+        run: ditto -c -k --sequesterRsrc --keepParent release/USB-AI-Rust-mac-arm64 LlamaNest-Speed-Mode-Mac-Apple-Silicon.zip
       - uses: actions/upload-artifact@v4
         with:
           name: LlamaNest-Speed-Mode-Mac-Apple-Silicon
