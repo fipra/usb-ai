@@ -1,5 +1,16 @@
 name: PrismML and MLX Mac experiment
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/prism-mlx-mac-experiment.yml'
+      - 'src/**'
+      - 'web/**'
+      - 'scripts/astra-*'
+      - 'scripts/test-prism-mlx-state.py'
+      - 'ASTRA-EXPERIMENT.md'
+      - 'esperimenti/index.html'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
   push:
     branches: [experiment/prism-mlx]
     paths:
@@ -65,6 +76,7 @@ jobs:
           path: LlamaNest-Prism-MLX-Mac-Apple-Silicon.zip
           if-no-files-found: error
       - name: Publish experimental download
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
