@@ -70,4 +70,6 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           tag=prism-mlx-mac-experimental-2026-11-10
-          gh release create "$tag" LlamaNest-Prism-MLX-Mac-Apple-Silicon.zip --target "$GITHUB_SHA" --title 'LlamaNest PrismML + MLX per Mac (esperimento)' --notes-file ASTRA-EXPERIMENT.md
+          if ! gh release create "$tag" LlamaNest-Prism-MLX-Mac-Apple-Silicon.zip --target "$GITHUB_SHA" --title 'LlamaNest PrismML + MLX per Mac (esperimento)' --notes-file ASTRA-EXPERIMENT.md; then
+            gh release upload "$tag" LlamaNest-Prism-MLX-Mac-Apple-Silicon.zip --clobber
+          fi
