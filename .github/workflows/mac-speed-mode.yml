@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [experiment/speed-mode]
-    paths: [.github/workflows/mac-speed-mode.yml, 'src/**', 'web/**', 'scripts/benchmark-speed-mode.py', 'scripts/test-mac-speed-mode.py', 'esperimenti/index.html', 'Cargo.toml', 'Cargo.lock']
+    paths: [.github/workflows/mac-speed-mode.yml, 'src/**', 'web/**', 'scripts/benchmark-speed-mode.py', 'scripts/test-mac-speed-mode.py', 'scripts/metal-disable-bf16.patch', 'esperimenti/index.html', 'Cargo.toml', 'Cargo.lock']
 permissions:
   contents: write
 jobs:
@@ -22,6 +22,7 @@ jobs:
           install="$RUNNER_TEMP/llama-install"
           git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$source"
           git -C "$source" checkout 8642541b255bfb5dc39cd351a178be09013a55d6
+          git -C "$source" apply "$GITHUB_WORKSPACE/scripts/metal-disable-bf16.patch"
           cmake -S "$source" -B "$build" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$install" \
